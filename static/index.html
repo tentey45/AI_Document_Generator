@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGED | Document Generator</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <i data-lucide="sparkles" class="logo-icon"></i>
+                <h1>A <span>GED</span></h1>
+            </div>
+            <nav>
+                <span>AI Multi-Mode Generator</span>
+            </nav>
+        </header>
+
+        <main>
+                <div class="mode-selector">
+                    <button class="mode-btn active" data-mode="developer">
+                        <i data-lucide="code"></i>
+                        <span>Developer</span>
+                    </button>
+                    <button class="mode-btn" data-mode="student">
+                        <i data-lucide="graduation-cap"></i>
+                        <span>Student</span>
+                    </button>
+                </div>
+
+                <div id="developer-options" class="option-group">
+                    <label>Programming Language</label>
+                    <div class="options-grid">
+                        <button class="opt-btn active" data-value="python">Python</button>
+                        <button class="opt-btn" data-value="javascript">JavaScript</button>
+                        <button class="opt-btn" data-value="java">Java</button>
+                        <button class="opt-btn" data-value="cpp">C++</button>
+                    </div>
+                </div>
+
+                <div id="student-options" class="option-group" style="display: none;">
+                    <label>Document Type</label>
+                    <div class="options-grid">
+                        <button class="opt-btn active" data-value="academic">Academic Paper</button>
+                        <button class="opt-btn" data-value="essay">Essay / Essay</button>
+                        <button class="opt-btn" data-value="general">General Doc</button>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label id="input-label" for="prompt">Source Code</label>
+                    <div class="textarea-wrapper">
+                        <textarea id="prompt" placeholder="Paste your code snippet here..."></textarea>
+                        <div class="status-indicator">
+                            <span class="dot"></span> AI Ready
+                        </div>
+                    </div>
+                </div>
+
+                <button id="generate-btn" class="primary-btn">
+                    <span>GENERATE DOCUMENT</span>
+                    <i data-lucide="sparkles"></i>
+                </button>
+            </section>
+
+            <section class="output-container">
+                <div class="output-header">
+                    <h2>Generated Output</h2>
+                    <div class="output-actions" id="output-actions" style="display: none;">
+                        <button id="copy-btn" title="Copy to Clipboard"><i data-lucide="copy"></i></button>
+                        <button id="download-btn" title="Download as Text"><i data-lucide="download"></i></button>
+                    </div>
+                </div>
+                <div id="output-display" class="output-content">
+                    <div class="placeholder">
+                        <i data-lucide="file-text"></i>
+                        <p>Your generated document will appear here...</p>
+                    </div>
+                </div>
+                <div id="loader" class="loader-overlay" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>AGED is crafting your document...</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 AGED.</p>
+    </footer>
+
+    <script src="/static/script.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
