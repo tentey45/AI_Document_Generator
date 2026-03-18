@@ -9,18 +9,22 @@
       }
     },
     {
-      "src": "backend/main.py",
-      "use": "@vercel/python"
+      "src": "api/chat.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "runtime": "python3.9"
+      }
     }
   ],
   "routes": [
     {
       "src": "/api/chat",
-      "dest": "/backend/main.py"
+      "dest": "/api/chat.py"
     },
     {
-      "src": "/chat",
-      "dest": "/backend/main.py"
+      "src": "/api/health",
+      "dest": "/api/chat.py/health"
     },
     {
       "src": "/(.*)",
