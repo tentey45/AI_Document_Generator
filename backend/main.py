@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+import os
 
 from ai_service import generate_document_v2, generate_assistant_response
 
@@ -53,4 +54,17 @@ def chat_endpoint(payload: ChatRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# For Vercel deployment
+@app.get("/")
+def root():
+    return {"message": "AI Assistant API is running"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
+
+# Vercel serverless handler
+handler = app
 

@@ -1,20 +1,72 @@
-# React + Vite
+# AI Assistant - Claude-like Document Generator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern AI assistant that understands user intent and generates adaptive responses for code documentation, academic papers, websites, and more.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Intent Detection**: Automatically understands user requests
+- **6 Response Modes**: Chat guidance, code documentation, document generation, code generation, website generation, rewrite/improve
+- **Claude-like UI**: Clean, modern interface with sidebar settings
+- **Smart Suggestions**: Provides next-step actions after each response
+- **User Types**: Optimized for Developers and Students
 
-## React Compiler
+## Deployment
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Vercel (Recommended)
 
-## Expanding the ESLint configuration
+1. Connect your GitHub repository to Vercel
+2. Vercel will automatically detect the project structure
+3. Set environment variables in Vercel dashboard:
+   - `GROQ_API_KEY`: Your Groq API key
+4. Deploy!
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Local Development
 
-```C
-    print("Hello World"))
+**Backend:**
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload
 ```
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Environment Variables
+
+- `GROQ_API_KEY`: Required for Groq API access
+
+## Project Structure
+
+```
+├── backend/
+│   ├── main.py          # FastAPI server
+│   ├── ai_service.py    # AI logic and intent detection
+│   └── config.py        # Configuration
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx      # React application
+│   │   └── index.css    # Styles
+│   └── package.json
+├── vercel.json          # Vercel configuration
+└── requirements.txt     # Python dependencies
+```
+
+## API Endpoints
+
+- `POST /chat` - Main chat endpoint with intent detection
+- `GET /health` - Health check endpoint
+
+## Usage
+
+1. Select your user type (Developer/Student)
+2. Set preferences (language, document style, etc.)
+3. Type your natural language request
+4. AI detects intent and provides appropriate response
+5. Click suggested next steps to continue conversation
