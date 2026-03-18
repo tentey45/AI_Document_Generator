@@ -38,6 +38,11 @@ def chat_endpoint(payload: ChatRequest):
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
 
     try:
+        # Check if API key is available
+        from config import GROQ_API_KEY
+        if not GROQ_API_KEY:
+            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured. Please set environment variable.")
+        
         # Extract preferences
         doc_style = payload.preferences.get("doc_style", "professional")
         language = payload.preferences.get("language", "auto")
@@ -52,8 +57,11 @@ def chat_endpoint(payload: ChatRequest):
             doc_type=doc_type
         )
         return result
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error in chat_endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 # For Vercel deployment

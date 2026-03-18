@@ -32,6 +32,10 @@ TEMPLATES = {
 def detect_intent(prompt: str) -> dict:
     """Internal LLM call to categorize the user's request with a router prompt."""
     try:
+        from config import GROQ_API_KEY
+        if not GROQ_API_KEY:
+            return {"mode": "chat_guidance", "detected_language": "auto", "is_technical": False, "intent_confidence": 0.5}
+        
         completion = client.chat.completions.create(
             model=MODEL,
             messages=[
@@ -42,7 +46,8 @@ def detect_intent(prompt: str) -> dict:
             response_format={"type": "json_object"}
         )
         return json.loads(completion.choices[0].message.content)
-    except Exception:
+    except Exception as e:
+        print(f"Error in detect_intent: {str(e)}")
         return {"mode": "chat_guidance", "detected_language": "auto", "is_technical": False, "intent_confidence": 0.5}
 
 def generate_assistant_response(message: str, user_context: str = "general", doc_style: str = "professional", language: str = "auto", doc_type: str = "auto") -> dict:
@@ -92,6 +97,19 @@ def generate_assistant_response(message: str, user_context: str = "general", doc
     )
 
     try:
+        from config import GROQ_API_KEY
+        if not GROQ_API_KEY:
+            return {
+                "detected_mode": "chat_guidance",
+                "content": "I'm sorry, but the AI service is not properly configured. Please ensure the GROQ_API_KEY environment variable is set.",
+                "next_actions": ["Check environment configuration", "Contact administrator", "Try again later"],
+                "meta": {
+                    "user_context": user_context,
+                    "confidence": 0.0,
+                    "error": "API key not configured"
+                }
+            }
+        
         completion = client.chat.completions.create(
             model=MODEL,
             messages=[
@@ -130,7 +148,17 @@ def generate_assistant_response(message: str, user_context: str = "general", doc
             }
         }
     except Exception as e:
-        raise RuntimeError(f"Assistant Response Failure: {str(e)}")
+        print(f"Error in generate_assistant_response: {str(e)}")
+        return {
+            "detected_mode": "chat_guidance",
+            "content": f"I'm sorry, but I encountered an error while processing your request: {str(e)}",
+            "next_actions": ["Try again with a simpler request", "Check if API key is valid", "Contact support if issue persists"],
+            "meta": {
+                "user_context": user_context,
+                "confidence": 0.0,
+                "error": str(e)
+            }
+        }
 
 def generate_document_v2(prompt: str, user_type: str = "general", sub_option: str = "auto", doc_style: str = "professional") -> dict:
     # We instruct the LLM to output a specific [NEXT_STEPS] block for easy parsing.
