@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from ai_service import generate_document
+from ai_service import generate_document_v2, generate_assistant_response
 
 
 app = FastAPI(title="AI Document Generator (Groq)")
@@ -17,30 +17,40 @@ app.add_middleware(
 )
 
 
-class GenerateDocumentRequest(BaseModel):
-    prompt: str = Field(..., description="What document to generate")
-    user_type: str = Field(default="developer", description="Type of user (Developer or Student)")
-    sub_option: str = Field(default="auto", description="Programming language, document type, or 'auto'")
-    doc_style: str = Field(default="developer", description="Writing style (professional, developer, simplified)")
+class ChatRequest(BaseModel):
+    message: str = Field(..., description="User's natural language message")
+    user_context: str = Field(default="general", description="User type: developer, student, general")
+    preferences: dict = Field(default={}, description="Optional user preferences")
 
 
-class GenerateDocumentResponse(BaseModel):
-    content: str
+class ChatResponse(BaseModel):
+    detected_mode: str = Field(..., description="AI detected response mode")
+    content: str = Field(..., description="Generated response content")
+    next_actions: list[str] = Field(default=[], description="Suggested next steps")
+    meta: dict = Field(default={}, description="Metadata about the response")
 
 
-@app.post("/generate-document", response_model=GenerateDocumentResponse)
-def generate_document_endpoint(payload: GenerateDocumentRequest) -> GenerateDocumentResponse:
-    prompt = (payload.prompt or "").strip()
-    if not prompt:
-        raise HTTPException(status_code=400, detail="Prompt must not be empty.")
+@app.post("/chat", response_model=ChatResponse)
+def chat_endpoint(payload: ChatRequest):
+    message = (payload.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty.")
 
     try:
-        content = generate_document(
-            prompt=prompt, 
-            user_type=(payload.user_type or "developer"), 
-            sub_option=(payload.sub_option or "auto"),
-            doc_style=(payload.doc_style or "developer")
+        # Extract preferences
+        doc_style = payload.preferences.get("doc_style", "professional")
+        language = payload.preferences.get("language", "auto")
+        doc_type = payload.preferences.get("doc_type", "auto")
+        
+        # Call enhanced AI service
+        result = generate_assistant_response(
+            message=message,
+            user_context=payload.user_context,
+            doc_style=doc_style,
+            language=language,
+            doc_type=doc_type
         )
-        return GenerateDocumentResponse(content=content)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
