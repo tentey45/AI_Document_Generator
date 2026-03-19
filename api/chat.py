@@ -1,16 +1,29 @@
-import sys
 import os
+import sys
 
-# Add backend directory to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
+# 1. Improved path resolution for Vercel functions
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+backend_path = os.path.join(parent_dir, 'backend')
+
+if backend_path not in sys.path:
+    sys.path.append(backend_path)
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import json
 
-# Import your existing functions
-from main import ChatRequest, ChatResponse, chat_endpoint
+# 2. Flexible imports to handle different deployment environments
+try:
+    from main import ChatRequest, ChatResponse, chat_endpoint, chat_stream_endpoint
+except ImportError as e:
+    print(f"IMPORT ERROR: Failed to import from main.py: {str(e)}")
+    # Fallback to local import if path is different
+    try:
+        from backend.main import ChatRequest, ChatResponse, chat_endpoint, chat_stream_endpoint
+    except ImportError:
+        raise ImportError(f"CRITICAL: Could not find backend logic. sys.path: {sys.path}")
 
 # Create FastAPI app for this function
 app = FastAPI(title="AGED - AI Document Generator API", version="1.0")
@@ -27,14 +40,7 @@ app.add_middleware(
 # Add the chat endpoints
 app.post("/chat", response_model=ChatResponse)(chat_endpoint)
 app.post("/", response_model=ChatResponse)(chat_endpoint)
-
-# Import the stream handler from backend.main
-try:
-    from main import chat_stream_endpoint
-    app.post("/chat-stream")(chat_stream_endpoint)
-    app.options("/chat-stream")(lambda: {"message": "ok"}) # Explicit CORS help for streams
-except ImportError:
-    print("Warning: chat_stream_endpoint not found in backend.main")
+app.post("/chat-stream")(chat_stream_endpoint)
 
 # Add health check
 @app.get("/health")
