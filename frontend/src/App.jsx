@@ -64,7 +64,8 @@ function App() {
     setNextActions([]);
 
     try {
-      const rawUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+      const isProd = !window.location.hostname.includes('localhost');
+      const rawUrl = import.meta.env.VITE_API_BASE_URL || (isProd ? '/api' : 'http://127.0.0.1:8000');
       const API_URL = rawUrl.replace(/\/$/, '');
       
       const response = await fetch(`${API_URL}/chat-stream`, {

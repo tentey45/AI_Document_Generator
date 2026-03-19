@@ -331,12 +331,97 @@ textarea {
 }
 
 .spinning {
-  animation: spin 1s linear infinite;
+  animation: spin 3s linear infinite;
 }
 
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 900px) {
+  .app-layout {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--glass-border);
+    padding: 20px;
+  }
+
+  .sidebar aside {
+    margin-bottom: 16px;
+  }
+
+  .main-content {
+    padding: 10px;
+    height: calc(100vh - 200px); /* Adjust for sidebar height */
+  }
+
+  .landing-card {
+    padding: 40px 20px;
+    width: 95%;
+  }
+
+  .persona-options {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .landing-card h1 {
+    font-size: 2.2rem !important;
+  }
+
+  .message {
+    padding: 12px 16px;
+  }
+
+  .ai-bubble {
+    padding: 16px;
+  }
+
+  .next-steps-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .input-area {
+    padding: 16px;
+  }
+
+  .input-wrapper {
+    padding: 12px;
+  }
+
+  .input-wrapper textarea {
+    font-size: 16px; /* Prevent iPhone zoom */
+  }
+}
+
+@media (max-width: 600px) {
+  .landing-card h1 {
+    font-size: 1.8rem !important;
+  }
+  
+  .landing-card p {
+    font-size: 1rem !important;
+  }
+
+  .icon-btn {
+    width: 36px;
+    height: 36px; /* Better tap target */
+  }
+
+  .sidebar {
+    padding: 16px;
+  }
+  
+  .sidebar h2 {
+    font-size: 1rem !important;
+  }
 }
 
 /* Mobile */
