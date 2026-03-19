@@ -1,9 +1,21 @@
-from groq import Groq, AuthenticationError, APIError, APIConnectionError, RateLimitError
-from config import GROQ_API_KEY
+from groq import Groq
 import json
+import os
 
 MODEL = "llama-3.3-70b-versatile"
-client = Groq(api_key=GROQ_API_KEY)
+
+def get_groq_client():
+    """Lazy-initializes the Groq client only when needed during a request."""
+    from config import GROQ_API_KEY
+    if not GROQ_API_KEY:
+        return None
+    
+    try:
+        # Initializing client here ensures no import-time crashes due to dependencies or missing keys
+        return Groq(api_key=GROQ_API_KEY)
+    except Exception as e:
+        print(f"Failed to initialize Groq client: {str(e)}")
+        return None
 
 # 1. ORCHESTRATOR SYSTEM PROMPT (The "Router")
 ROUTER_PROMPT = (
@@ -31,6 +43,10 @@ TEMPLATES = {
 
 def detect_intent(prompt: str) -> dict:
     """Internal LLM call to categorize the user's request with a router prompt."""
+    client = get_groq_client()
+    if not client:
+        return {"mode": "chat_guidance", "detected_language": "auto", "is_technical": False, "intent_confidence": 0.5}
+
     try:
         completion = client.chat.completions.create(
             model=MODEL,
@@ -42,7 +58,8 @@ def detect_intent(prompt: str) -> dict:
             response_format={"type": "json_object"}
         )
         return json.loads(completion.choices[0].message.content)
-    except Exception:
+    except Exception as e:
+        print(f"Error in detect_intent: {str(e)}")
         return {"mode": "chat_guidance", "detected_language": "auto", "is_technical": False, "intent_confidence": 0.5}
 
 def generate_assistant_response(message: str, user_context: str = "general", doc_style: str = "professional", language: str = "auto", doc_type: str = "auto") -> dict:
@@ -92,6 +109,16 @@ def generate_assistant_response(message: str, user_context: str = "general", doc
     )
 
     try:
+        client = get_groq_client()
+        if not client:
+            return {
+                "error": "Configuration Error",
+                "detected_mode": "chat_guidance",
+                "content": "I'm sorry, but the AI service is not properly configured. Please check your GROQ_API_KEY.",
+                "next_actions": ["Check environment variables", "Verify deployment dashboard"],
+                "meta": {"error": "GROQ_API_KEY_MISSING"}
+            }
+        
         completion = client.chat.completions.create(
             model=MODEL,
             messages=[
@@ -130,44 +157,30 @@ def generate_assistant_response(message: str, user_context: str = "general", doc
             }
         }
     except Exception as e:
-        raise RuntimeError(f"Assistant Response Failure: {str(e)}")
+        print(f"Error in generate_assistant_response: {str(e)}")
+        return {
+            "detected_mode": "chat_guidance",
+            "content": f"I'm sorry, but I encountered an error while processing your request: {str(e)}",
+            "next_actions": ["Check backend logs", "Verify Groq API Key", "Try again"],
+            "meta": {
+                "user_context": user_context,
+                "confidence": 0.0,
+                "error": str(e)
+            }
+        }
 
 def generate_document_v2(prompt: str, user_type: str = "general", sub_option: str = "auto", doc_style: str = "professional") -> dict:
-    # We instruct the LLM to output a specific [NEXT_STEPS] block for easy parsing.
-    system_message = (
-        f"ASSISTANT ROLE: {expert_persona}\n"
-        f"CONTEXT: The user is a {user_type}. Response must match a {doc_style} style.\n"
-        f"TASK: Address the prompt: '{prompt}'\n\n"
-        f"FINAL RULE: You MUST append a section at the very end of your response starting exactly with '### [NEXT_STEPS]' followed by 3 actionable next steps the user can take based on your response, each on a new line starting with '-'."
+    """Legacy wrapper for backward compatibility, now using the enhanced assistant logic."""
+    # To avoid scope errors and duplicate code, we proxy to the new orchestrator
+    result = generate_assistant_response(
+        message=prompt,
+        user_context=user_type,
+        doc_style=doc_style
     )
-
-    try:
-        completion = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.3
-        )
-        full_text = completion.choices[0].message.content.strip()
-        
-        # 4. Parse Content & Next Steps
-        content = full_text
-        next_steps = []
-        
-        if "### [NEXT_STEPS]" in full_text:
-            parts = full_text.split("### [NEXT_STEPS]")
-            content = parts[0].strip()
-            # Extract each bullet point
-            raw_steps = parts[1].strip().split("\n")
-            next_steps = [s.strip("- ").strip() for s in raw_steps if s.strip().startswith("-")]
-
-        return {
-            "mode": mode,
-            "content": content,
-            "next_steps": next_steps,
-            "meta": intent_data
-        }
-    except Exception as e:
-        raise RuntimeError(f"Engine Alignment Failure: {str(e)}")
+    # Map back to old key names if necessary
+    return {
+        "mode": result["detected_mode"],
+        "content": result["content"],
+        "next_steps": result["next_actions"],
+        "meta": result["meta"]
+    }

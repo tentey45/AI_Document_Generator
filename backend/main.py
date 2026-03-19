@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+import os
 
 from ai_service import generate_document_v2, generate_assistant_response
 
@@ -10,7 +11,10 @@ app = FastAPI(title="AI Document Generator (Groq)")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,20 +41,48 @@ def chat_endpoint(payload: ChatRequest):
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
 
     try:
-        # Extract preferences
-        doc_style = payload.preferences.get("doc_style", "professional")
-        language = payload.preferences.get("language", "auto")
-        doc_type = payload.preferences.get("doc_type", "auto")
+        # Import dynamically to prevent crashes at startup
+        from config import GROQ_API_KEY
+        if not GROQ_API_KEY:
+            raise HTTPException(
+                status_code=500, 
+                detail={"error": "Configuration Error", "message": "GROQ_API_KEY not configured."}
+            )
         
         # Call enhanced AI service
         result = generate_assistant_response(
             message=message,
             user_context=payload.user_context,
-            doc_style=doc_style,
-            language=language,
-            doc_type=doc_type
+            doc_style=payload.preferences.get("doc_style", "professional"),
+            language=payload.preferences.get("language", "auto"),
+            doc_type=payload.preferences.get("doc_type", "auto")
         )
+        
+        # If result itself indicates an error, handle gracefully
+        if "error" in result:
+             raise HTTPException(status_code=500, detail={"error": result["error"], "message": result["message"] if "message" in result else result["content"]})
+             
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Critical error in chat_endpoint: {str(e)}")
+        # FORCED JSON ERROR RESPONSE
+        raise HTTPException(
+            status_code=500, 
+            detail={"error": "Internal Backend Failure", "detail": str(e)}
+        )
+
+
+# For Vercel deployment
+@app.get("/")
+def root():
+    return {"message": "AI Assistant API is running"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
+
+# Vercel serverless handler
+handler = app
 
