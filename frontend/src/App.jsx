@@ -89,12 +89,21 @@ function App() {
         }),
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Failed to connect to AI assistant.');
+      // SAFE RESPONSE HANDLING
+      const responseText = await response.text();
+      let data;
+      
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseErr) {
+        // If not JSON, it's likely a text error from the server/load balancer
+        throw new Error(responseText || `Server returned ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || 'Failed to connect to AI assistant.');
+      }
+
       setAssistantResponse(data.content);
       setDetectedMode(data.detected_mode);
       setNextActions(data.next_actions || []);

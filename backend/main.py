@@ -11,7 +11,10 @@ app = FastAPI(title="AI Document Generator (Groq)")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,30 +41,37 @@ def chat_endpoint(payload: ChatRequest):
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
 
     try:
-        # Check if API key is available
+        # Import dynamically to prevent crashes at startup
         from config import GROQ_API_KEY
         if not GROQ_API_KEY:
-            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured. Please set environment variable.")
-        
-        # Extract preferences
-        doc_style = payload.preferences.get("doc_style", "professional")
-        language = payload.preferences.get("language", "auto")
-        doc_type = payload.preferences.get("doc_type", "auto")
+            raise HTTPException(
+                status_code=500, 
+                detail={"error": "Configuration Error", "message": "GROQ_API_KEY not configured."}
+            )
         
         # Call enhanced AI service
         result = generate_assistant_response(
             message=message,
             user_context=payload.user_context,
-            doc_style=doc_style,
-            language=language,
-            doc_type=doc_type
+            doc_style=payload.preferences.get("doc_style", "professional"),
+            language=payload.preferences.get("language", "auto"),
+            doc_type=payload.preferences.get("doc_type", "auto")
         )
+        
+        # If result itself indicates an error, handle gracefully
+        if "error" in result:
+             raise HTTPException(status_code=500, detail={"error": result["error"], "message": result["message"] if "message" in result else result["content"]})
+             
         return result
     except HTTPException:
-        raise  # Re-raise HTTP exceptions
+        raise
     except Exception as e:
-        print(f"Error in chat_endpoint: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        print(f"Critical error in chat_endpoint: {str(e)}")
+        # FORCED JSON ERROR RESPONSE
+        raise HTTPException(
+            status_code=500, 
+            detail={"error": "Internal Backend Failure", "detail": str(e)}
+        )
 
 
 # For Vercel deployment

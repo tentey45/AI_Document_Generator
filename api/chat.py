@@ -13,7 +13,7 @@ import json
 from main import ChatRequest, ChatResponse, chat_endpoint
 
 # Create FastAPI app for this function
-app = FastAPI(title="AI Assistant API")
+app = FastAPI(title="AGED - AI Document Generator API", version="1.0")
 
 # Add CORS middleware
 app.add_middleware(
@@ -24,8 +24,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add the chat endpoint
+# Add the chat endpoint (Handle both /chat and root / for Vercel routing)
 app.post("/chat", response_model=ChatResponse)(chat_endpoint)
+app.post("/", response_model=ChatResponse)(chat_endpoint)
 
 # Add health check
 @app.get("/health")
