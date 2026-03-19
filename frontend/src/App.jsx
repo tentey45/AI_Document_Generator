@@ -79,9 +79,9 @@ function App() {
         doc_type: documentType
       };
 
-      // Use Vercel/Render env variable, fallback to '/api' for local Vite proxy
-      const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'; 
-      const response = await fetch(`${API_BASE_URL}/chat`, {
+      // Use Vercel env variable, fallback to local backend for Dev
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'; 
+      const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
