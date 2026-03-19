@@ -23,6 +23,10 @@
       "dest": "/api/chat.py"
     },
     {
+      "src": "/api/chat-stream",
+      "dest": "/api/chat.py"
+    },
+    {
       "src": "/api/health",
       "dest": "/api/chat.py/health"
     },

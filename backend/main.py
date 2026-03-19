@@ -5,13 +5,14 @@ import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 try:
-    from backend.ai_service import generate_document_v2, generate_assistant_response
+    from backend.ai_service import generate_document_v2, generate_assistant_response, generate_assistant_streaming
 except ImportError:
-    from ai_service import generate_document_v2, generate_assistant_response
+    from ai_service import generate_document_v2, generate_assistant_response, generate_assistant_streaming
 
 
 app = FastAPI(title="AI Document Generator (Groq)")
@@ -79,7 +80,27 @@ def chat_endpoint(payload: ChatRequest):
         )
 
 
-# For Vercel deployment
+@app.post("/chat-stream")
+def chat_stream_endpoint(payload: ChatRequest):
+    message = (payload.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty.")
+
+    # Generator wrapper to handle stream formatting if needed
+    def event_stream():
+        try:
+            for chunk in generate_assistant_streaming(
+                message=message,
+                user_context=payload.user_context,
+                doc_style=payload.preferences.get("doc_style", "professional"),
+                language=payload.preferences.get("language", "auto"),
+                doc_type=payload.preferences.get("doc_type", "auto")
+            ):
+                yield chunk
+        except Exception as e:
+            yield f"\n[Backend Error: {str(e)}]"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 @app.get("/")
 def root():
     return {"message": "AI Assistant API is running"}

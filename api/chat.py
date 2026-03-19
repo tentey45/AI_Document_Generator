@@ -24,9 +24,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add the chat endpoint (Handle both /chat and root / for Vercel routing)
+# Add the chat endpoints
 app.post("/chat", response_model=ChatResponse)(chat_endpoint)
 app.post("/", response_model=ChatResponse)(chat_endpoint)
+
+# Import the stream handler from backend.main
+try:
+    from main import chat_stream_endpoint
+    app.post("/chat-stream")(chat_stream_endpoint)
+    app.options("/chat-stream")(lambda: {"message": "ok"}) # Explicit CORS help for streams
+except ImportError:
+    print("Warning: chat_stream_endpoint not found in backend.main")
 
 # Add health check
 @app.get("/health")
