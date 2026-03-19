@@ -1,123 +1,75 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Code, GraduationCap, FileText, Copy, Download, Check, AlertCircle, Trash2, Sun, Moon } from 'lucide-react';
+import { Sparkles, Code, GraduationCap, FileText, Copy, Download, Check, AlertCircle, Trash2, Sun, Moon, Send, Settings, BookOpen, Layers } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus, prism } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import './index.css';
 
+// Import the generated isometric asset
+import heroAsset from '/Users/anbschool0019/.gemini/antigravity/brain/cd2a861f-5887-4829-8152-dcaa356c0dd7/ai_isometric_cube_1773905117105.png';
+
 function App() {
-  const [userType, setUserType] = useState('developer'); // 'developer' or 'student'
-  const [documentStyle, setDocumentStyle] = useState('professional');
-  const [language, setLanguage] = useState('auto');
-  const [documentType, setDocumentType] = useState('auto');
+  const [persona, setPersona] = useState(localStorage.getItem('user_persona') || null); // 'developer' or 'learner'
   const [message, setMessage] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [assistantResponse, setAssistantResponse] = useState(null);
   const [detectedMode, setDetectedMode] = useState('');
   const [nextActions, setNextActions] = useState([]);
   const [error, setError] = useState(null);
-  const [warning, setWarning] = useState(null);
   const [copied, setCopied] = useState(false);
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => setTheme(theme === 'light' ? 'dark' : 'light');
-
-  const handleUserTypeChange = (newType) => {
-    setUserType(newType);
-    setLanguage('auto');
-    setDocumentType('auto');
-    setWarning(null);
-    setError(null);
-  };
-
-  const handleMessageChange = (e) => {
-    const val = e.target.value;
-    setMessage(val);
-
-    // Smart validation
-    if (userType === 'student' && (val.includes('function ') || val.includes('class ') || val.includes('const ') || val.includes('def '))) {
-      setWarning('Your input looks like code. Switch to Developer mode for better assistance!');
-    } else if (userType === 'developer' && val.includes('<html') && val.includes('</html>')) {
-      setWarning('This looks like HTML. Consider using website generation mode.');
-    } else {
-      setWarning(null);
+    if (persona) {
+      localStorage.setItem('user_persona', persona);
     }
-  };
-
-  const clearConversation = () => {
-    setMessage('');
-    setAssistantResponse(null);
-    setDetectedMode('');
-    setNextActions([]);
-    setError(null);
-    setWarning(null);
-  };
+  }, [persona]);
 
   const handleSendMessage = async () => {
-    if (!message.trim()) {
-      setError('Please enter a message.');
-      return;
-    }
+    if (!message.trim()) return;
 
     setIsThinking(true);
     setError(null);
     setAssistantResponse(null);
-    setDetectedMode('');
-    setNextActions([]);
 
     try {
-      const preferences = {
-        doc_style: documentStyle,
-        language: language,
-        doc_type: documentType
-      };
-
-      // Use Vercel env variable, fallback to local backend for Dev
-      const rawUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'; 
-      const API_URL = rawUrl.replace(/\/$/, ''); // Remove trailing slash
+      const rawUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+      const API_URL = rawUrl.replace(/\/$/, '');
+      
       const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: message,
-          user_context: userType,
-          preferences: preferences
+          user_context: persona,
+          preferences: {
+            theme: 'futuristic',
+            high_fidelity: true
+          }
         }),
       });
 
-      // SAFE RESPONSE HANDLING
       const responseText = await response.text();
       let data;
-      
       try {
         data = JSON.parse(responseText);
-      } catch (parseErr) {
-        // If not JSON, it's likely a text error from the server/load balancer
-        throw new Error(responseText || `Server returned ${response.status} ${response.statusText}`);
+      } catch (e) {
+        throw new Error("Backend returned invalid response. Check your API key.");
       }
 
       if (!response.ok) {
-        throw new Error(data.detail || data.error || 'Failed to connect to AI assistant.');
+        throw new Error(data.detail?.message || data.detail || 'Connection failed');
       }
 
       setAssistantResponse(data.content);
       setDetectedMode(data.detected_mode);
       setNextActions(data.next_actions || []);
-      setWarning(null);
       
-      // Auto-scroll to response
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     } catch (err) {
-      console.error('AI Error:', err);
       setError(err.message);
     } finally {
       setIsThinking(false);
@@ -132,222 +84,173 @@ function App() {
     });
   };
 
-  const handleDownload = () => {
-    if (!assistantResponse) return;
-    const blob = new Blob([assistantResponse], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `AI_Response_${userType}_${new Date().getTime()}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  // 1. LANDING / PERSONA SELECTION
+  if (!persona) {
+    return (
+      <div className="persona-overlay">
+        <div className="glass-container persona-card">
+          <img src={heroAsset} alt="AI Core" className="hero-image" />
+          <h1 style={{fontSize: '3rem', fontWeight: 800, marginBottom: '16px'}}>
+            A<span style={{color: 'var(--accent-cyan)'}}>GEN</span> V3
+          </h1>
+          <p style={{color: 'var(--text-dim)', fontSize: '1.2rem'}}>How will you use the AI assistant today?</p>
+          
+          <div className="persona-grid">
+            <div className="glass-container persona-option" onClick={() => setPersona('developer')}>
+              <Code className="persona-icon" />
+              <h3>Developer</h3>
+              <p style={{fontSize: '0.9rem', opacity: 0.7}}>Focus on optimized code, architecture, and documentation.</p>
+            </div>
+            <div className="glass-container persona-option learner" onClick={() => setPersona('learner')}>
+              <GraduationCap className="persona-icon" />
+              <h3>Learrer</h3>
+              <p style={{fontSize: '0.9rem', opacity: 0.7}}>Clear explanations, conceptual guides, and learning paths.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
+  // 2. MAIN WORKSPACE
   return (
-    <div className="app-container">
-      <header>
-        <div className="logo">
-          <Sparkles size={28} style={{ color: 'var(--accent-primary)' }} />
-          <h1>A<span>GEN</span></h1>
+    <div className="app-layout">
+      {/* Sidebar Settings */}
+      <aside className="glass-container sidebar">
+        <div style={{display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px'}}>
+          <Sparkles color="var(--accent-cyan)" />
+          <h2 style={{fontSize: '1.5rem'}}>AI Portal</h2>
         </div>
-        <div className="nav-actions">
-          <button className="theme-btn" onClick={toggleTheme} title="Toggle Theme">
-            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-          </button>
-          <button className="theme-btn" onClick={clearConversation} title="Clear Conversation">
-            <Trash2 size={20} />
-          </button>
-        </div>
-      </header>
-
-      <main className="assistant-layout">
-        {/* Left Sidebar */}
-        <aside className="settings-sidebar">
-          <div className="sidebar-section">
-            <h3>User Type</h3>
-            <div className="user-type-switch">
-              <button 
-                className={`user-type-btn ${userType === 'developer' ? 'active' : ''}`}
-                onClick={() => handleUserTypeChange('developer')}
-              >
-                <Code size={18} /> Developer
-              </button>
-              <button 
-                className={`user-type-btn ${userType === 'student' ? 'active' : ''}`}
-                onClick={() => handleUserTypeChange('student')}
-              >
-                <GraduationCap size={18} /> Student
-              </button>
-            </div>
+        
+        <div style={{flex: 1}}>
+          <div className="persona-indicator" style={{
+            padding: '16px', 
+            borderRadius: '12px', 
+            background: persona === 'developer' ? 'rgba(0, 242, 255, 0.1)' : 'rgba(188, 19, 254, 0.1)',
+            borderLeft: `4px solid ${persona === 'developer' ? 'var(--accent-cyan)' : 'var(--accent-purple)'}`,
+            marginBottom: '20px'
+          }}>
+            <p style={{fontSize: '0.8rem', opacity: 0.6, textTransform: 'uppercase'}}>Currently</p>
+            <h4 style={{textTransform: 'capitalize'}}>{persona} Mode</h4>
           </div>
 
-          <div className="sidebar-section">
-            <h3>Preferences</h3>
-            {userType === 'developer' ? (
-              <>
-                <div className="form-group">
-                  <label>Document Style</label>
-                  <select value={documentStyle} onChange={(e) => setDocumentStyle(e.target.value)}>
-                    <option value="developer">Developer Style</option>
-                    <option value="professional">Professional Style</option>
-                    <option value="simple">Simple Style</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Programming Language</label>
-                  <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-                    <option value="auto">Auto Detect</option>
-                    <option value="python">Python</option>
-                    <option value="javascript">JavaScript</option>
-                    <option value="java">Java</option>
-                    <option value="cpp">C++</option>
-                  </select>
-                </div>
-              </>
-            ) : (
-              <div className="form-group">
-                <label>Document Type</label>
-                <select value={documentType} onChange={(e) => setDocumentType(e.target.value)}>
-                  <option value="auto">Auto Detect</option>
-                  <option value="academic">Academic</option>
-                  <option value="proposal">Proposal</option>
-                  <option value="defense">Defense</option>
-                  <option value="professional">Professional</option>
-                  <option value="simple">Simple</option>
-                </select>
-              </div>
-            )}
-          </div>
-        </aside>
+          <button className="glass-container" onClick={() => setPersona(null)} style={{
+            width: '100%', padding: '12px', background: 'transparent', color: 'white', cursor: 'pointer'
+          }}>
+            Switch Persona
+          </button>
+        </div>
 
-        {/* Main Workspace */}
-        <div className="main-workspace">
-          {/* Response Area */}
-          <div className="response-container">
-            {detectedMode && (
-              <div className="detected-mode">
-                <span className="mode-label">Mode:</span>
-                <span className="mode-value">{detectedMode}</span>
+        <div style={{opacity: 0.3, fontSize: '0.8rem', textAlign: 'center'}}>
+          © 2026 AI Document Generator
+        </div>
+      </aside>
+
+      {/* Main interaction */}
+      <main className="main-content">
+        <div className="glass-container panel">
+          <div className="response-area">
+            {!assistantResponse && !isThinking && (
+              <div style={{height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.2}}>
+                <Layers size={80} />
+                <p style={{marginTop: '20px', fontSize: '1.2rem'}}>Initialize sequence...</p>
               </div>
             )}
-            
-            <div className="response-content">
-              {error ? (
-                <div className="error-message">
-                  <AlertCircle size={24} />
-                  <div>
-                    <strong>Error:</strong> {error}
-                  </div>
-                </div>
-              ) : isThinking ? (
-                <div className="thinking-indicator">
-                  <div className="thinking-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </div>
-                  <p>AI is thinking...</p>
-                </div>
-              ) : assistantResponse ? (
-                <>
-                  <div className="response-text">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        code({ node, inline, className, children, ...props }) {
-                          const match = /language-(\w+)/.exec(className || '');
-                          return !inline && match ? (
-                            <SyntaxHighlighter
-                              style={theme === 'dark' ? vscDarkPlus : prism}
-                              language={match[1]}
-                              PreTag="div"
-                              {...props}
-                            >
-                              {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                          ) : (
-                            <code className={className} {...props}>
-                              {children}
-                            </code>
-                          );
-                        }
-                      }}
-                    >
-                      {assistantResponse}
-                    </ReactMarkdown>
-                  </div>
-                  
-                  {/* Next Actions */}
-                  {nextActions.length > 0 && (
-                    <div className="next-actions">
-                      <h4>Suggested Next Steps</h4>
-                      <div className="action-buttons">
-                        {nextActions.map((action, index) => (
-                          <button key={index} className="action-btn" onClick={() => setMessage(action)}>
-                            {action}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="empty-state">
-                  <FileText size={64} style={{ opacity: 0.2 }} />
-                  <p>Ask me anything! </p>
-                </div>
-              )}
-            </div>
-            
-            {/* Response Actions */}
+
             {assistantResponse && (
-              <div className="response-actions">
-                <button className="action-btn secondary" onClick={handleCopy}>
-                  {copied ? <Check size={18} /> : <Copy size={18} />}
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-                <button className="action-btn secondary" onClick={handleDownload}>
-                  <Download size={18} /> Download
-                </button>
+              <div className="ai-content">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    code({ node, inline, className, children, ...props }) {
+                      const match = /language-(\w+)/.exec(className || '');
+                      return !inline && match ? (
+                        <div className="code-block">
+                          <SyntaxHighlighter
+                            style={vscDarkPlus}
+                            language={match[1]}
+                            PreTag="div"
+                            {...props}
+                          >
+                            {String(children).replace(/\n$/, '')}
+                          </SyntaxHighlighter>
+                        </div>
+                      ) : (
+                        <code style={{background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px'}} {...props}>
+                          {children}
+                        </code>
+                      );
+                    }
+                  }}
+                >
+                  {assistantResponse}
+                </ReactMarkdown>
+
+                {nextActions.length > 0 && (
+                  <div style={{marginTop: '40px', borderTop: '1px solid var(--glass-border)', paddingTop: '20px'}}>
+                    <h4 style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: 'var(--accent-cyan)'}}>
+                      <BookOpen size={18} /> Suggested Next Steps
+                    </h4>
+                    <div style={{display: 'flex', gap: '12px', flexWrap: 'wrap'}}>
+                      {nextActions.map((action, i) => (
+                        <button key={i} className="glass-container" onClick={() => setMessage(action)} style={{
+                          padding: '8px 16px', background: 'rgba(255,255,255,0.05)', color: 'white', cursor: 'pointer', fontSize: '0.9rem'
+                        }}>
+                          {action}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
-          </div>
-          
-          <div ref={messagesEndRef} />
-        </div>
 
-        {/* Input Area */}
-        <div className="input-area">
-          {warning && (
-            <div className="warning-message">
-              <AlertCircle size={18} />
-              <span>{warning}</span>
+            {isThinking && (
+              <div style={{display: 'flex', gap: '8px', alignItems: 'center', color: 'var(--accent-cyan)'}}>
+                <Sparkles className="spinning" />
+                <span>Generating high-fidelity response...</span>
+              </div>
+            )}
+
+            {error && (
+              <div className="glass-container" style={{padding: '20px', borderLeft: '4px solid #ff4b4b', background: 'rgba(255,75,75,0.05)'}}>
+                <p style={{color: '#ff4b4b'}}><strong>Error:</strong> {error}</p>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="input-bar">
+            <div className="chat-input-wrapper">
+              <textarea
+                placeholder={`Ask as a ${persona}...`}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+              />
+              <button 
+                onClick={handleSendMessage}
+                disabled={isThinking || !message.trim()}
+                style={{
+                  background: 'var(--accent-cyan)', 
+                  border: 'none', 
+                  borderRadius: '12px', 
+                  padding: '12px', 
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: 'var(--glow-cyan)'
+                }}
+              >
+                <Send size={20} color="black" />
+              </button>
             </div>
-          )}
-          
-          <div className="input-container">
-            <textarea 
-              className="message-input"
-              placeholder="Ask me anything!"
-              value={message}
-              onChange={handleMessageChange}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-            />
-            <button 
-              className="send-button" 
-              onClick={handleSendMessage}
-              disabled={isThinking || !message.trim()}
-            >
-              <Sparkles size={20} />
-              {isThinking ? 'Thinking...' : 'Send'}
-            </button>
           </div>
         </div>
       </main>
