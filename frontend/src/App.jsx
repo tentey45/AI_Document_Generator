@@ -80,7 +80,8 @@ function App() {
       };
 
       // Use Vercel env variable, fallback to local backend for Dev
-      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'; 
+      const rawUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'; 
+      const API_URL = rawUrl.replace(/\/$/, ''); // Remove trailing slash
       const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
