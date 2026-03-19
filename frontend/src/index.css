@@ -1,6 +1,13 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-aged-dark: #0a0a0f;
+  --color-aged-card: rgba(20, 20, 30, 0.6);
+  --color-aged-cyan: #00f2ff;
+  --color-aged-purple: #9d4edd;
+  --color-aged-border: rgba(255, 255, 255, 0.08);
+  --shadow-aged-glow: 0 0 30px rgba(0, 242, 255, 0.2);
+}
 
 @layer base {
   body {
