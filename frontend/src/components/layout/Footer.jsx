@@ -1,7 +1,7 @@
 const Footer = () => {
   return (
     <footer>
-      <p>&copy; 2026 AGED. Powered by Groq Llama-3.</p>
+      <p>&copy; 2026 Powered by AGED.</p>
     </footer>
   );
 };
