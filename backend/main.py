@@ -1,7 +1,12 @@
+import os
+import sys
+
+# Add the current (backend) directory to the Python path so it can find its modules
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-import os
 
 try:
     from backend.ai_service import generate_document_v2, generate_assistant_response
