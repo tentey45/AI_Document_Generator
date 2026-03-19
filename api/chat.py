@@ -25,8 +25,25 @@ except ImportError as e:
     except ImportError:
         raise ImportError(f"CRITICAL: Could not find backend logic. sys.path: {sys.path}")
 
+from fastapi.responses import JSONResponse
+import traceback
+
 # Create FastAPI app for this function
 app = FastAPI(title="AGED - AI Document Generator API", version="1.0")
+
+# Global Exception Handler for Vercel Debugging
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal Server Error",
+            "message": str(exc),
+            "traceback": traceback.format_exc(),
+            "sys_path": sys.path,
+            "current_dir": os.getcwd()
+        }
+    )
 
 # Add CORS middleware
 app.add_middleware(
@@ -37,12 +54,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add the chat endpoints
+# Add the chat endpoints with multiple path variations to handle Vercel proxying
+app.post("/api/chat", response_model=ChatResponse)(chat_endpoint)
 app.post("/chat", response_model=ChatResponse)(chat_endpoint)
 app.post("/", response_model=ChatResponse)(chat_endpoint)
+
+app.post("/api/chat-stream")(chat_stream_endpoint)
 app.post("/chat-stream")(chat_stream_endpoint)
 
 # Add health check
+@app.get("/api/health")
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
