@@ -56,9 +56,24 @@ function App() {
     setNextActions([]);
 
     try {
-      const isProd = !window.location.hostname.includes('localhost');
-      const rawUrl = import.meta.env.VITE_API_BASE_URL || (isProd ? '/api' : 'http://127.0.0.1:8000');
-      const API_URL = rawUrl.replace(/\/$/, '');
+      // 1. Get the Raw URL and Print it for Debugging
+      let rawUrl = import.meta.env.VITE_API_BASE_URL || '';
+      console.log('App: rawUrl found in environment:', rawUrl);
+      
+      // 2. FORCED: Ignore old Render.com links completely
+      if (rawUrl && rawUrl.includes('onrender.com')) {
+        console.warn('App: Detected legacy Render URL. Ignoring for Vercel native /api.');
+        rawUrl = '';
+      }
+
+      // 3. Determine if we are on Localhost or Production
+      const isLocal = window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1');
+      
+      // 4. Force /api for all non-local deployments
+      const finalUrl = rawUrl || (!isLocal ? '/api' : 'http://127.0.0.1:8000');
+      const API_URL = finalUrl.replace(/\/$/, '');
+      
+      console.log('App: Final API_URL target:', API_URL);
       
       const response = await fetch(`${API_URL}/chat-stream`, {
         method: 'POST',
@@ -189,7 +204,7 @@ function App() {
       <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-aged-dark">
         <div className="glass max-w-2xl w-full p-8 md:p-12 text-center animate-message-in">
           <img src={heroAsset} alt="AI Engine" className="w-48 mx-auto mb-8 drop-shadow-[0_0_20px_rgba(0,242,255,0.4)]" />
-          <h1 className="text-4xl md:text-5xl font-extrabold mb-2 tracking-tight">A<span className="text-aged-cyan">GED</span></h1>
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-2 tracking-tight">A<span className="text-aged-cyan">GED</span> <span className="text-xs text-slate-500 font-mono align-middle">(v4.1)</span></h1>
           <p className="text-slate-400 text-lg mb-10">Premium AI Document & Strategy Accelerator</p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
