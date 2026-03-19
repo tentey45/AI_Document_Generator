@@ -4,16 +4,15 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { saveAs } from 'file-saver';
 
 import './index.css';
-
-// Local assets if any
 import heroAsset from './assets/hero_ai.png';
 
 function App() {
-  const [persona, setPersona] = useState(localStorage.getItem('user_persona') || null);
+  // Always start with persona = null so landing page is shown
+  const [persona, setPersona] = useState(null);
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -40,13 +39,6 @@ function App() {
       { value: 'Step-by-Step Tutorial', label: 'Step-by-Step Tutorial' }
     ]
   };
-
-  useEffect(() => {
-    if (persona) {
-      localStorage.setItem('user_persona', persona);
-      setDocType('auto');
-    }
-  }, [persona]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -134,14 +126,13 @@ function App() {
   };
 
   const handleCopy = (text, idx) => {
-    // Organzie Text: Stipping markdown symbols to provide just the clean "Organized" text lines
     const contentLines = text.split('**Next Steps:**')[0].trim().split('\n');
     const cleanLines = contentLines.map(line => {
         let l = line.trim();
-        l = l.replace(/^[#]+\s+/, ''); // Remove # headers
-        l = l.replace(/^[\*\-\+]\s+/, '• '); // List conversion
-        l = l.replace(/\*\*(.*?)\*\*/g, '$1'); // Remove **
-        l = l.replace(/`(.*?)`/g, '$1'); // Remove `
+        l = l.replace(/^[#]+\s+/, '');
+        l = l.replace(/^[\*\-\+]\s+/, '• ');
+        l = l.replace(/\*\*(.*?)\*\*/g, '$1');
+        l = l.replace(/`(.*?)`/g, '$1');
         return l;
     });
 
@@ -151,129 +142,73 @@ function App() {
     });
   };
 
-  const generatePrintableHTML = (content) => {
-    // Format: Black text with Professional Blue Highlight for code segments
-    const formattedContent = content
-      .replace(/^# (.*$)/gim, '<h1 style="color: #000; margin-bottom: 20px;">$1</h1>')
-      .replace(/^## (.*$)/gim, '<h2 style="color: #000; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 30px;">$1</h2>')
-      .replace(/^### (.*$)/gim, '<h3 style="color: #111; margin-top: 25px;">$1</h3>')
+  const handleDownloadPDF = (content) => {
+    const printWindow = window.open('', '_blank');
+    const formattedContent = content.split('**Next Steps:**')[0]
+      .replace(/^# (.*$)/gim, '<h1 style="color:#000;margin-bottom:20px;">$1</h1>')
+      .replace(/^## (.*$)/gim, '<h2 style="color:#000;border-bottom:1px solid #ccc;padding-bottom:5px;margin-top:30px;">$1</h2>')
       .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
-      .replace(/`(.*?)`/g, '<span style="color: #0056b3; font-family: monospace; font-weight: 500;">$1</span>')
+      .replace(/`(.*?)`/g, '<span style="color:#0056b3;font-family:monospace;font-weight:500;">$1</span>')
       .replace(/\n\n/gim, '<br><br>')
       .replace(/\n/gim, '<br>');
 
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Project Export</title>
-          <style>
-            body { font-family: 'Inter', Arial, sans-serif; padding: 60px; color: #000; line-height: 1.8; max-width: 850px; margin: 0 auto; background: #fff; }
-            h1, h2, h3 { font-weight: 800; font-family: 'Inter', sans-serif; }
-            @media print {
-              body { padding: 0px; }
-              @page { margin: 2.5cm; }
-            }
-          </style>
-        </head>
-        <body>
-          <div style="font-size: 11px; color: #777; margin-bottom: 40px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
-            AI DOCUMENT ACCELERATOR | PERSONA: ${persona.toUpperCase()} | ${new Date().toLocaleDateString()}
-          </div>
-          ${formattedContent.split('**Next Steps:**')[0]}
-        </body>
-      </html>
-    `;
-  };
-
-  const handleDownloadPDF = (content) => {
-    const printWindow = window.open('', '_blank');
-    const html = generatePrintableHTML(content);
-    printWindow.document.write(html);
+    printWindow.document.write(`
+      <html><head><style>body{font-family:sans-serif;padding:60px;color:#000;line-height:1.8;max-width:850px;margin:0 auto;}</style></head><body>
+      <div style="font-size:11px;color:#777;margin-bottom:40px;">PERSONA: ${persona.toUpperCase()} | ${new Date().toLocaleDateString()}</div>
+      ${formattedContent}</body></html>
+    `);
     printWindow.document.close();
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
+    setTimeout(() => printWindow.print(), 500);
   };
 
   const handleDownloadDoc = (content, index) => {
-    // Generate REAL .docx binary file using 'docx' library
     const lines = content.split('**Next Steps:**')[0].trim().split('\n');
     const paragraphs = lines.map(line => {
         const text = line.trim();
-        if (text.startsWith('# ')) {
-            return new Paragraph({ text: text.replace('# ', ''), heading: HeadingLevel.HEADING_1 });
-        } else if (text.startsWith('## ')) {
-            return new Paragraph({ text: text.replace('## ', ''), heading: HeadingLevel.HEADING_2 });
-        } else if (text.startsWith('### ')) {
-            return new Paragraph({ text: text.replace('### ', ''), heading: HeadingLevel.HEADING_3 });
-        }
-        
-        // Handle bolding and code highlights for standard lines
+        if (text.startsWith('# ')) return new Paragraph({ text: text.replace('# ', ''), heading: HeadingLevel.HEADING_1 });
+        if (text.startsWith('## ')) return new Paragraph({ text: text.replace('## ', ''), heading: HeadingLevel.HEADING_2 });
         const runs = [];
-        let remaining = text;
-        
-        // Very basic parser for **bold** and `code`
         const regex = /(\*\*.*?\*\*|`.*?`)/g;
-        let match;
-        let lastIdx = 0;
-        
+        let match, lastIdx = 0;
         while ((match = regex.exec(text)) !== null) {
-            if (match.index > lastIdx) {
-                runs.push(new TextRun(text.slice(lastIdx, match.index)));
-            }
+            if (match.index > lastIdx) runs.push(new TextRun(text.slice(lastIdx, match.index)));
             const chunk = match[0];
-            if (chunk.startsWith('**')) {
-                runs.push(new TextRun({ text: chunk.replace(/\*\*/g, ''), bold: true }));
-            } else if (chunk.startsWith('`')) {
-                runs.push(new TextRun({ text: chunk.replace(/`/g, ''), color: "0056B3" }));
-            }
+            if (chunk.startsWith('**')) runs.push(new TextRun({ text: chunk.replace(/\*\*/g, ''), bold: true }));
+            else if (chunk.startsWith('`')) runs.push(new TextRun({ text: chunk.replace(/`/g, ''), color: "0056B3" }));
             lastIdx = regex.lastIndex;
         }
-        if (lastIdx < text.length) {
-            runs.push(new TextRun(text.slice(lastIdx)));
-        }
-
+        if (lastIdx < text.length) runs.push(new TextRun(text.slice(lastIdx)));
         return new Paragraph({ children: runs.length > 0 ? runs : [new TextRun(text)] });
     });
-
-    const doc = new Document({
-      sections: [{
-        properties: {},
-        children: paragraphs
-      }]
-    });
-
-    Packer.toBlob(doc).then(blob => {
-      saveAs(blob, `AGED_Export_${index}.docx`);
-    });
-  };
-
-  const clearChat = () => {
-    setMessages([]);
-    setNextActions([]);
-    setError(null);
+    const doc = new Document({ sections: [{ children: paragraphs }] });
+    Packer.toBlob(doc).then(blob => saveAs(blob, `AGED_Export_${index}.docx`));
   };
 
   if (!persona) {
     return (
-      <div className="landing-overlay">
-        <div className="landing-card glass">
-          <img src={heroAsset} alt="AI Engine" style={{width: '200px', margin: '0 auto 24px', filter: 'drop-shadow(0 0 20px var(--accent-cyan))'}} />
-          <h1 style={{fontSize: '3rem', fontWeight: 800, marginBottom: '8px'}}>A<span style={{color: 'var(--accent-cyan)'}}>GED</span></h1>
-          <p style={{color: 'var(--text-dim)', fontSize: '1.2rem'}}>The Premium AI Document & Strategy Accelerator</p>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-aged-dark">
+        <div className="glass max-w-2xl w-full p-8 md:p-12 text-center animate-message-in">
+          <img src={heroAsset} alt="AI Engine" className="w-48 mx-auto mb-8 drop-shadow-[0_0_20px_rgba(0,242,255,0.4)]" />
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-2 tracking-tight">A<span className="text-aged-cyan">GED</span></h1>
+          <p className="text-slate-400 text-lg mb-10">Premium AI Document & Strategy Accelerator</p>
           
-          <div className="persona-options">
-            <div className="option-card glass" onClick={() => setPersona('developer')}>
-              <Code size={48} color="var(--accent-cyan)" />
-              <h3 style={{margin: '16px 0 8px'}}>Developer Mode</h3>
-              <p style={{fontSize: '0.85rem', color: 'var(--text-dim)'}}>Detailed READMEs, API mapping, and exhaustive technical specs.</p>
-            </div>
-            <div className="option-card glass" onClick={() => setPersona('learner')}>
-              <GraduationCap size={48} color="var(--accent-purple)" />
-              <h3 style={{margin: '16px 0 8px'}}>Learner Mode</h3>
-              <p style={{fontSize: '0.85rem', color: 'var(--text-dim)'}}>Code discovery, architectural breakdowns, and mentored learning.</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <button 
+                onClick={() => setPersona('developer')}
+                className="glass p-8 text-left hover:border-aged-cyan hover:bg-aged-cyan/5 transition-all group"
+            >
+              <Code size={40} className="text-aged-cyan mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-xl font-bold mb-2">Developer Mode</h3>
+              <p className="text-slate-400 text-sm">Automated READMEs, technical specs, and API documentation.</p>
+            </button>
+            <button 
+                onClick={() => setPersona('learner')}
+                className="glass p-8 text-left hover:border-aged-purple hover:bg-aged-purple/5 transition-all group"
+            >
+              <GraduationCap size={40} className="text-aged-purple mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-xl font-bold mb-2">Learner Mode</h3>
+              <p className="text-slate-400 text-sm">Deep code discovery, architectural help, and mentored learning.</p>
+            </button>
           </div>
         </div>
       </div>
@@ -281,105 +216,100 @@ function App() {
   }
 
   return (
-    <div className="app-layout">
-      <aside className="sidebar glass">
-        <div style={{display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px'}}>
-          <Sparkles color="var(--accent-cyan)" fill="var(--accent-cyan)" size={24} />
-          <h2 style={{fontSize: '1.2rem', fontWeight: 700}}>AGED CORE</h2>
+    <div className="flex flex-col md:flex-row h-screen w-screen p-4 gap-4">
+      {/* Sidebar - Collapses on Mobile */}
+      <aside className="glass w-full md:w-[280px] p-6 flex flex-col shrink-0 relative overflow-hidden">
+        <div className="flex items-center gap-3 mb-8">
+          <Sparkles className="text-aged-cyan fill-aged-cyan" size={24} />
+          <h2 className="text-lg font-bold">AGED CORE</h2>
+          <button onClick={() => setPersona(null)} className="md:hidden ml-auto text-slate-400"><RefreshCw size={18}/></button>
         </div>
 
-        <div style={{flex: 1, display: 'flex', flexDirection: 'column', gap: '20px'}}>
-          <div className="persona-box glass" style={{padding: '16px', borderLeft: `4px solid ${persona === 'developer' ? 'var(--accent-cyan)' : 'var(--accent-purple)'}`}}>
-            <p style={{fontSize: '0.7rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '1px'}}>Active Persona</p>
-            <h4 style={{textTransform: 'capitalize'}}>{persona}</h4>
+        <div className="flex flex-col gap-6 flex-1">
+          <div className="glass p-4 border-l-4 border-aged-cyan">
+            <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">Active Persona</p>
+            <h4 className="capitalize font-bold text-aged-cyan">{persona}</h4>
           </div>
 
-          <div className="dropdown-container">
-            <p style={{fontSize: '0.7rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px'}}>
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-2">
               <FileCode size={12} /> Documentation Type
             </p>
             <select 
               value={docType} 
               onChange={(e) => setDocType(e.target.value)}
-              className="glass-select"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-aged-cyan appearance-none"
+              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
             >
               {docOptions[persona].map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option key={opt.value} value={opt.value} className="bg-slate-900">{opt.label}</option>
               ))}
             </select>
           </div>
 
-          <div style={{marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px'}}>
-            <button className="step-btn" onClick={() => setPersona(null)} style={{width: '100%', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center'}}>
-              <RefreshCw size={14} /> Reset Identity
+          <div className="mt-auto hidden md:flex flex-col gap-3">
+            <button onClick={() => setPersona(null)} className="glass py-2 flex items-center justify-center gap-2 text-sm hover:border-aged-cyan">
+              <RefreshCw size={14} /> Switch Persona
             </button>
-            <button className="step-btn" onClick={clearChat} style={{width: '100%', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', color: '#ff4b4b'}}>
+            <button onClick={() => setMessages([])} className="glass py-2 flex items-center justify-center gap-2 text-sm text-red-500 hover:border-red-500">
               <Trash2 size={14} /> Clear Session
             </button>
           </div>
         </div>
-
-        <div style={{marginTop: '24px', textAlign: 'center', opacity: 0.3, fontSize: '0.7rem'}}>
-          POWERED AGED™ <br/> © 2026 AI DOCUMENT ACCELERATOR
-        </div>
       </aside>
 
-      <main className="main-content">
-        <div className="chat-panel glass">
-          <div className="messages-container">
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+        <div className="glass flex-1 flex flex-col overflow-hidden relative">
+          <div className="flex-1 overflow-y-auto p-4 md:p-10 space-y-8 scroll-smooth">
             {messages.length === 0 && !isThinking && (
-              <div style={{height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.2, textAlign: 'center'}}>
+              <div className="h-full flex flex-col items-center justify-center opacity-20 text-center">
                 <SidebarIcon size={64} />
-                <h2 style={{marginTop: '24px'}}>Awaiting Input</h2>
-                <p>Select your document target and begin the stream.</p>
+                <h2 className="text-2xl mt-6">Awaiting Strategic Input</h2>
+                <p className="text-sm">Initiate the stream to generate premium documentation.</p>
               </div>
             )}
 
             {messages.map((msg, idx) => (
-              <div key={idx} className={`message ${msg.role === 'user' ? 'message-user' : 'message-ai'}`}>
+              <div key={idx} className={`max-w-[95%] md:max-w-[85%] animate-message-in ${msg.role === 'user' ? 'ml-auto' : ''}`}>
                 {msg.role === 'user' ? (
-                  <div style={{display: 'flex', alignItems: 'flex-start', gap: '12px'}}>
-                    <User size={18} style={{marginTop: '4px'}} />
-                    <p>{msg.content}</p>
+                  <div className="bg-aged-cyan/10 border border-aged-cyan/20 px-6 py-4 rounded-3xl rounded-br-none">
+                    <div className="flex items-start gap-3">
+                        <User size={18} className="mt-1 shrink-0" />
+                        <p className="text-sm md:text-base leading-relaxed">{msg.content}</p>
+                    </div>
                   </div>
                 ) : (
-                  <div className="ai-bubble">
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-cyan)'}}>
+                  <div className="glass bg-white/[0.02] p-6 md:p-10 rounded-3xl rounded-bl-none">
+                    <div className="flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-2 text-aged-cyan">
                             <Bot size={20} />
-                            <span style={{fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase'}}>Autonomous Intelligence</span>
+                            <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest">Autonomous Core x64</span>
                         </div>
-                        <div className="action-row" style={{display: 'flex', gap: '8px'}}>
-                            <button onClick={() => handleCopy(msg.content, idx)} title="Copy Text" className="icon-btn">
-                                {copyStatus === idx ? <Check size={14} color="var(--accent-cyan)" /> : <Copy size={14} />}
+                        <div className="flex gap-2">
+                            <button onClick={() => handleCopy(msg.content, idx)} className="w-8 md:w-10 h-8 md:h-10 glass flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all">
+                                {copyStatus === idx ? <Check size={16} className="text-aged-cyan" /> : <Copy size={16} />}
                             </button>
-                            <button onClick={() => handleDownloadDoc(msg.content, idx)} title="Download DOC" className="icon-btn">
-                                <FileText size={14} />
+                            <button onClick={() => handleDownloadDoc(msg.content, idx)} className="w-8 md:w-10 h-8 md:h-10 glass flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all">
+                                <FileText size={16} />
                             </button>
-                            <button onClick={() => handleDownloadPDF(msg.content)} title="Download PDF" className="icon-btn">
-                                <Download size={14} />
+                            <button onClick={() => handleDownloadPDF(msg.content)} className="w-8 md:w-10 h-8 md:h-10 glass flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all">
+                                <Download size={16} />
                             </button>
                         </div>
                     </div>
                     
-                    <div className="prose">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={{
+                    <div className="prose prose-invert max-w-none prose-p:text-slate-300 prose-headings:text-aged-cyan prose-code:text-aged-cyan prose-code:bg-white/5 prose-code:px-1 prose-code:rounded">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
                           code({ node, inline, className, children, ...props }) {
                             const match = /language-(\w+)/.exec(className || '');
                             return !inline && match ? (
-                              <SyntaxHighlighter
-                                style={vscDarkPlus}
-                                language={match[1]}
-                                PreTag="div"
-                                {...props}
-                              >
-                                {String(children).replace(/\n$/, '')}
-                              </SyntaxHighlighter>
-                            ) : (
-                              <code {...props}>{children}</code>
-                            );
+                              <div className="my-4 rounded-xl overflow-hidden border border-white/10">
+                                <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
+                                    {String(children).replace(/\n$/, '')}
+                                </SyntaxHighlighter>
+                              </div>
+                            ) : ( <code className="bg-white/10 px-1.5 py-0.5 rounded text-aged-cyan" {...props}>{children}</code> );
                           }
                         }}
                       >
@@ -388,13 +318,13 @@ function App() {
                     </div>
 
                     {idx === messages.length - 1 && !isStreaming && nextActions.length > 0 && (
-                      <div className="next-steps-container">
-                        <h4 style={{display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-cyan)', fontSize: '0.85rem'}}>
+                      <div className="mt-10 pt-8 border-t border-white/10">
+                        <h4 className="flex items-center gap-2 text-aged-cyan text-xs font-bold uppercase tracking-widest mb-4">
                           <BookOpen size={16} /> Strategic Escalation
                         </h4>
-                        <div className="next-steps-grid">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           {nextActions.map((action, i) => (
-                            <button key={i} className="step-btn" onClick={() => handleSendMessage(action)}>
+                            <button key={i} className="glass py-2 px-4 text-xs md:text-sm text-left hover:border-aged-cyan transition-all" onClick={() => handleSendMessage(action)}>
                               {action}
                             </button>
                           ))}
@@ -407,43 +337,39 @@ function App() {
             ))}
 
             {isThinking && (
-              <div style={{display: 'flex', gap: '12px', alignItems: 'center', color: 'var(--accent-cyan)', padding: '24px'}}>
-                <Loader2 className="spinning" size={20} />
-                <span style={{fontSize: '0.9rem', fontWeight: 500}}>Synthesizing Deep Context...</span>
+              <div className="flex gap-3 items-center text-aged-cyan px-6 py-8">
+                <Loader2 className="animate-spin" size={20} />
+                <span className="text-sm font-medium tracking-wide">Synthesizing Context...</span>
               </div>
             )}
 
             {error && (
-              <div className="glass" style={{padding: '16px 24px', borderLeft: '4px solid #ff4b4b', background: 'rgba(255,75,75,0.05)', alignSelf: 'center', maxWidth: '600px'}}>
-                <div style={{display: 'flex', alignItems: 'center', gap: '12px', color: '#ff4b4b'}}>
+              <div className="glass p-4 border-l-4 border-red-500 bg-red-500/5 max-w-lg mx-auto">
+                <div className="flex items-center gap-3 text-red-500">
                   <AlertCircle size={20} />
-                  <p><strong>System Breach:</strong> {error}</p>
+                  <p className="text-sm font-bold uppercase tracking-tight">System Breach: {error}</p>
                 </div>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="input-area">
-            <div className="input-wrapper">
+          <div className="p-4 md:p-8 mt-auto">
+            <div className="glass bg-white/5 focus-within:ring-2 focus-within:ring-aged-cyan/50 p-2 md:p-3 flex items-center gap-3 md:gap-4 transition-all">
               <textarea
                 placeholder={`Query for ${docType === 'auto' ? 'General' : docType} as ${persona}...`}
+                className="flex-1 bg-transparent border-none text-white text-sm md:text-base resize-none outline-none pl-2 md:pl-4 max-h-40"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                 rows={1}
               />
               <button 
-                className="send-btn"
+                className="bg-aged-cyan text-black w-10 md:w-12 h-10 md:h-12 rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 disabled:opacity-30 disabled:grayscale transition-all"
                 onClick={() => handleSendMessage()}
                 disabled={isStreaming || isThinking || !inputText.trim()}
               >
-                <Send size={20} color="black" />
+                <Send size={20} />
               </button>
             </div>
           </div>
