@@ -9,6 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 # 1. INTEGRATED CONFIGURATION
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    print("Warning: python-dotenv not installed. Skipping local environment loading.")
+
 # Vercel environment variables are preferred
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
