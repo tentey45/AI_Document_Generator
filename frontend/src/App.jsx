@@ -6,8 +6,8 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import './index.css';
 
-// Import the generated isometric asset
-import heroAsset from '/Users/anbschool0019/.gemini/antigravity/brain/cd2a861f-5887-4829-8152-dcaa356c0dd7/ai_isometric_cube_1773905117105.png';
+// Import the local asset
+import heroAsset from './assets/hero_ai.png';
 
 function App() {
   const [persona, setPersona] = useState(localStorage.getItem('user_persona') || null); // 'developer' or 'learner'
