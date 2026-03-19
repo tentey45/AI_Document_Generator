@@ -123,13 +123,16 @@ def generate_assistant_response(message: str, user_context: str = "general", doc
                 "meta": {"error": "GROQ_API_KEY_MISSING"}
             }
         
+        # Build the completion with expanded parameters
         completion = client.chat.completions.create(
             model=MODEL,
             messages=[
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": message},
             ],
-            temperature=0.4
+            temperature=1,
+            max_tokens=8192,
+            top_p=1
         )
         full_text = completion.choices[0].message.content.strip()
         
