@@ -1,41 +1,119 @@
 import os
 import sys
-
-# 1. Prioritize internal Lambda directory
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
-
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 import json
 import traceback
+from groq import Groq
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
-# 2. Local Imports for Vercel Bundle Compatibility
-try:
-    from main import ChatRequest, ChatResponse, chat_endpoint, chat_stream_endpoint
-except ImportError as e:
-    # Diagnostic for user error reporting
-    raise ImportError(f"CRITICAL: Could not find backend logic in Lambda directory. sys.path: {sys.path}. Error: {str(e)}")
+# 1. INTEGRATED CONFIGURATION
+# Vercel environment variables are preferred
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# Create FastAPI app for this function
-app = FastAPI(title="AGED - AI Document Generator API", version="1.0")
+# 2. INTEGRATED SCHEMAS
+class ChatRequest(BaseModel):
+    message: str = Field(..., description="User's natural language message")
+    user_context: str = Field(default="general", description="User type: developer, learner, general")
+    preferences: dict = Field(default={}, description="Optional user preferences")
 
-# Global Exception Handler for debugging
+class ChatResponse(BaseModel):
+    detected_mode: str = Field(..., description="AI detected response mode")
+    content: str = Field(..., description="Generated response content")
+    next_actions: list[str] = Field(default=[], description="Suggested next steps")
+    meta: dict = Field(default={}, description="Metadata about the response")
+
+# 3. INTEGRATED AI LOGIC
+STABLE_MODEL = "llama-3.3-70b-versatile"
+
+PERSONAS = {
+    "developer": (
+        "You are an Elite Developer Advocate and Technical Writer. You understand the profound needs of software engineers. "
+        "When generating documentation, follow these principles: "
+        "- Detail is preferred over brevity ('Too long is better than too short'). "
+        "- Structure must be logical and exhaustive. "
+        "- For READMEs, prioritize: Name, Description, Badges, Visuals, Installation, Usage, Support, Roadmap, Contributing, Authors, License, and Project Status. "
+        "- Use technical, precise language."
+    ),
+    "learner": (
+        "You are a Senior Code Mentor specializing in deep technical discovery. "
+        "Your goal is to help students 'feel' and understand how code works at a fundamental level. "
+        "When generating explanations, focus on: "
+        "- Breaking down complex logic line-by-line. "
+        "- Explaining the 'Why' behind architectural choices. "
+        "- Providing analogies and tutorials."
+    )
+}
+
+TEMPLATES = {
+    "chat_guidance": "Provide strategic guidance using first-principles reasoning.",
+    "code_documentation": "Provide technically exhaustive mappings of code architecture.",
+    "document_generation": "Engineer high-fidelity professional-grade documentation.",
+    "code_generation": "Design production-ready software components.",
+    "website_generation": "Architect premium UI/UX components.",
+    "rewrite_improve": "Perform editorial refinement for linguistic impact."
+}
+
+def get_groq_client():
+    if not GROQ_API_KEY:
+        return None
+    try:
+        return Groq(api_key=GROQ_API_KEY)
+    except:
+        return None
+
+def generate_assistant_streaming(message: str, user_context: str = "general", doc_style: str = "professional", doc_type: str = "auto"):
+    persona_base = PERSONAS.get(user_context, PERSONAS["developer"])
+    expert_persona = TEMPLATES.get("chat_guidance", "Strategic guidance")
+    
+    system_message = (
+        f"CORE PERSONA: {persona_base}\n"
+        f"CONTEXTUAL MAPPING: {user_context.upper()} | Doc: {doc_type}\n"
+        f"REASONING PROTOCOL:\n"
+        f"- Analyze: '{message}'\n"
+        f"- Maintain high-fidelity output.\n"
+        f"POST-RESPONSE: Finalize with exactly three strategic next steps under '**Next Steps:**'."
+    )
+
+    client = get_groq_client()
+    if not client:
+        yield "Error: Groq client not initialized. Check GROQ_API_KEY in Vercel settings."
+        return
+
+    try:
+        completion = client.chat.completions.create(
+            model=STABLE_MODEL,
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": f"USER INPUT: {message}"},
+            ],
+            temperature=1,
+            max_tokens=8192,
+            top_p=1,
+            stream=True
+        )
+        for chunk in completion:
+            content = chunk.choices[0].delta.content or ""
+            if content:
+                yield content
+    except Exception as e:
+        yield f"Stream Error: {str(e)}"
+
+# 4. INTEGRATED FASTAPI APP
+app = FastAPI(title="AGED AI CORE (INTEGRATED)")
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     return JSONResponse(
         status_code=500,
         content={
-            "error": "Internal Server Error",
+            "error": "Integrated Engine Failure",
             "message": str(exc),
             "traceback": traceback.format_exc()
         }
     )
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,28 +122,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add the chat endpoints with absolute and relative variations
-app.post("/api/chat", response_model=ChatResponse)(chat_endpoint)
-app.post("/chat", response_model=ChatResponse)(chat_endpoint)
-app.post("/", response_model=ChatResponse)(chat_endpoint)
+@app.post("/api/chat-stream")
+@app.post("/chat-stream")
+async def chat_stream_endpoint(payload: ChatRequest):
+    message = (payload.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message empty.")
 
-app.post("/api/chat-stream")(chat_stream_endpoint)
-app.post("/chat-stream")(chat_stream_endpoint)
+    def event_stream():
+        for chunk in generate_assistant_streaming(
+            message=message,
+            user_context=payload.user_context,
+            doc_type=payload.preferences.get("doc_type", "auto")
+        ):
+            yield chunk
 
-# Add health check
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
 @app.get("/api/health")
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    return {"status": "healthy", "engine": "integrated-v4"}
 
 @app.get("/")
 def root():
-    return {"message": "AI Assistant API (Vercel Node x Python) is running"}
+    return {"message": "AGED AI Integrated Core is ONLINE"}
 
-# Vercel serverless handler
 handler = app
-
-# For direct testing
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
