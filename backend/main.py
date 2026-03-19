@@ -3,7 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import os
 
-from ai_service import generate_document_v2, generate_assistant_response
+try:
+    from backend.ai_service import generate_document_v2, generate_assistant_response
+except ImportError:
+    from ai_service import generate_document_v2, generate_assistant_response
 
 
 app = FastAPI(title="AI Document Generator (Groq)")

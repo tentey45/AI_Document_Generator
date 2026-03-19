@@ -6,7 +6,11 @@ MODEL = "llama-3.3-70b-versatile"
 
 def get_groq_client():
     """Lazy-initializes the Groq client only when needed during a request."""
-    from config import GROQ_API_KEY
+    try:
+        from backend.config import GROQ_API_KEY
+    except ImportError:
+        from config import GROQ_API_KEY
+    
     if not GROQ_API_KEY:
         return None
     
