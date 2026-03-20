@@ -2,7 +2,7 @@ import os
 import sys
 import json
 import traceback
-from groq import Groq
+from groq import AsyncGroq
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -65,11 +65,11 @@ def get_groq_client():
     if not GROQ_API_KEY:
         return None
     try:
-        return Groq(api_key=GROQ_API_KEY)
+        return AsyncGroq(api_key=GROQ_API_KEY)
     except:
         return None
 
-def generate_assistant_streaming(message: str, user_context: str = "general", doc_style: str = "professional", doc_type: str = "auto"):
+async def generate_assistant_streaming(message: str, user_context: str = "general", doc_style: str = "professional", doc_type: str = "auto"):
     persona_base = PERSONAS.get(user_context, PERSONAS["developer"])
     expert_persona = TEMPLATES.get("chat_guidance", "Strategic guidance")
     
@@ -88,7 +88,7 @@ def generate_assistant_streaming(message: str, user_context: str = "general", do
         return
 
     try:
-        completion = client.chat.completions.create(
+        completion = await client.chat.completions.create(
             model=STABLE_MODEL,
             messages=[
                 {"role": "system", "content": system_message},
@@ -99,7 +99,7 @@ def generate_assistant_streaming(message: str, user_context: str = "general", do
             top_p=1,
             stream=True
         )
-        for chunk in completion:
+        async for chunk in completion:
             content = chunk.choices[0].delta.content or ""
             if content:
                 yield content
@@ -135,8 +135,8 @@ async def chat_stream_endpoint(payload: ChatRequest):
     if not message:
         raise HTTPException(status_code=400, detail="Message empty.")
 
-    def event_stream():
-        for chunk in generate_assistant_streaming(
+    async def event_stream():
+        async for chunk in generate_assistant_streaming(
             message=message,
             user_context=payload.user_context,
             doc_type=payload.preferences.get("doc_type", "auto")
