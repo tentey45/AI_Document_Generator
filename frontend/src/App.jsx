@@ -9,6 +9,7 @@ import { saveAs } from 'file-saver';
 
 import './index.css';
 import heroAsset from './assets/hero_ai.png';
+import LandingPage from './components/layout/LandingPage';
 
 function App() {
   // Always start with persona = null so landing page is shown
