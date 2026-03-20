@@ -21,6 +21,7 @@ function App() {
   const [error, setError] = useState(null);
   const [docType, setDocType] = useState('auto');
   const [copyStatus, setCopyStatus] = useState(null); 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
   const docOptions = {
@@ -200,44 +201,35 @@ function App() {
   };
 
   if (!persona) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-aged-dark">
-        <div className="glass max-w-2xl w-full p-8 md:p-12 text-center animate-message-in">
-          <img src={heroAsset} alt="AI Engine" className="w-48 mx-auto mb-8 drop-shadow-[0_0_20px_rgba(0,242,255,0.4)]" />
-          <h1 className="text-4xl md:text-5xl font-extrabold mb-2 tracking-tight">A<span className="text-aged-cyan">GED</span> <span className="text-xs text-slate-500 font-mono align-middle">(v4.1)</span></h1>
-          <p className="text-slate-400 text-lg mb-10">Premium AI Document & Strategy Accelerator</p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <button 
-                onClick={() => setPersona('developer')}
-                className="glass p-8 text-left hover:border-aged-cyan hover:bg-aged-cyan/5 transition-all group"
-            >
-              <Code size={40} className="text-aged-cyan mb-4 group-hover:scale-110 transition-transform" />
-              <h3 className="text-xl font-bold mb-2">Developer Mode</h3>
-              <p className="text-slate-400 text-sm">Automated READMEs, technical specs, and API documentation.</p>
-            </button>
-            <button 
-                onClick={() => setPersona('learner')}
-                className="glass p-8 text-left hover:border-aged-purple hover:bg-aged-purple/5 transition-all group"
-            >
-              <GraduationCap size={40} className="text-aged-purple mb-4 group-hover:scale-110 transition-transform" />
-              <h3 className="text-xl font-bold mb-2">Learner Mode</h3>
-              <p className="text-slate-400 text-sm">Deep code discovery, architectural help, and mentored learning.</p>
-            </button>
-          </div>
+    return <LandingPage onSelect={(mode) => setPersona(mode)} />;
+  }  return (
+    <div className="flex flex-col md:flex-row h-screen w-screen p-0 md:p-4 gap-0 md:gap-4 overflow-hidden">
+      {/* Mobile Header */}
+      <div className="md:hidden flex items-center justify-between p-4 glass rounded-none border-t-0 border-x-0 relative z-50">
+        <div className="flex items-center gap-2">
+          <Sparkles className="text-aged-cyan" size={20} />
+          <h2 className="text-sm font-bold tracking-widest text-white">AGED AI</h2>
         </div>
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 glass">
+          <SidebarIcon size={18} className="text-aged-cyan" />
+        </button>
       </div>
-    );
-  }
 
-  return (
-    <div className="flex flex-col md:flex-row h-screen w-screen p-4 gap-4">
-      {/* Sidebar - Collapses on Mobile */}
-      <aside className="glass w-full md:w-[280px] p-6 flex flex-col shrink-0 relative overflow-hidden">
-        <div className="flex items-center gap-3 mb-8">
-          <Sparkles className="text-aged-cyan fill-aged-cyan" size={24} />
-          <h2 className="text-lg font-bold">AGED CORE</h2>
-          <button onClick={() => setPersona(null)} className="md:hidden ml-auto text-slate-400"><RefreshCw size={18}/></button>
+      {/* Sidebar - Animated Mobile Overlay */}
+      <aside className={`
+        fixed md:relative z-50 inset-y-0 left-0 w-[280px] md:w-[280px] 
+        glass shadow-2xl md:shadow-none p-6 flex flex-col shrink-0 
+        transition-all duration-300 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full md:translate-x-0 opacity-0 md:opacity-100'}
+      `}>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <Sparkles className="text-aged-cyan fill-aged-cyan" size={22} />
+            <h2 className="text-lg font-bold">AGED CORE</h2>
+          </div>
+          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-400">
+             <Check size={20} className="text-aged-cyan" />
+          </button>
         </div>
 
         <div className="flex flex-col gap-6 flex-1">
@@ -248,83 +240,104 @@ function App() {
 
           <div>
             <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-2">
-              <FileCode size={12} /> Documentation Type
+              <FileCode size={12} /> Doc Format
             </p>
-            <select 
-              value={docType} 
-              onChange={(e) => setDocType(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-aged-cyan appearance-none"
-              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
-            >
-              {docOptions[persona].map(opt => (
-                <option key={opt.value} value={opt.value} className="bg-slate-900">{opt.label}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <select 
+                value={docType} 
+                onChange={(e) => setDocType(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-aged-cyan appearance-none cursor-pointer"
+              >
+                {docOptions[persona].map(opt => (
+                  <option key={opt.value} value={opt.value} className="bg-slate-900">{opt.label}</option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                <FileText size={14} />
+              </div>
+            </div>
           </div>
 
-          <div className="mt-auto hidden md:flex flex-col gap-3">
-            <button onClick={() => setPersona(null)} className="glass py-2 flex items-center justify-center gap-2 text-sm hover:border-aged-cyan">
-              <RefreshCw size={14} /> Switch Persona
+          <div className="mt-auto flex flex-col gap-3">
+            <button onClick={() => { setPersona(null); setIsSidebarOpen(false); }} className="glass py-2.5 flex items-center justify-center gap-2 text-xs font-semibold hover:border-aged-cyan transition-colors">
+              <RefreshCw size={14} /> Reset Persona
             </button>
-            <button onClick={() => setMessages([])} className="glass py-2 flex items-center justify-center gap-2 text-sm text-red-500 hover:border-red-500">
+            <button onClick={() => { setMessages([]); setIsSidebarOpen(false); }} className="glass py-2.5 flex items-center justify-center gap-2 text-xs font-semibold text-red-400 hover:border-red-500/50 transition-colors">
               <Trash2 size={14} /> Clear Session
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* Click overlay for mobile sidebar */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <div className="glass flex-1 flex flex-col overflow-hidden relative">
-          <div className="flex-1 overflow-y-auto p-4 md:p-10 space-y-8 scroll-smooth">
+        <div className="glass flex-1 flex flex-col overflow-hidden m-0 md:rounded-2xl border-none md:border md:border-white/10 relative z-10">
+          <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-10 scroll-smooth custom-scrollbar">
             {messages.length === 0 && !isThinking && (
-              <div className="h-full flex flex-col items-center justify-center opacity-20 text-center">
-                <SidebarIcon size={64} />
-                <h2 className="text-2xl mt-6">Awaiting Strategic Input</h2>
-                <p className="text-sm">Initiate the stream to generate premium documentation.</p>
+              <div className="h-full flex flex-col items-center justify-center opacity-40 text-center px-6">
+                <div className="relative mb-6">
+                  <div className="absolute inset-0 bg-aged-cyan/20 blur-2xl rounded-full"></div>
+                  <Bot size={64} className="text-aged-cyan relative" />
+                </div>
+                <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white">System Online</h2>
+                <p className="text-sm text-slate-400 mt-2 max-w-xs">Enter a query to architect premium documentation or receive strategic guidance.</p>
               </div>
             )}
 
             {messages.map((msg, idx) => (
               <div key={idx} className={`max-w-[95%] md:max-w-[85%] animate-message-in ${msg.role === 'user' ? 'ml-auto' : ''}`}>
                 {msg.role === 'user' ? (
-                  <div className="bg-aged-cyan/10 border border-aged-cyan/20 px-6 py-4 rounded-3xl rounded-br-none">
+                  <div className="bg-aged-cyan/10 border border-aged-cyan/20 px-5 md:px-6 py-3.5 md:py-4 rounded-2xl rounded-br-none shadow-[0_0_15px_rgba(0,242,255,0.05)]">
                     <div className="flex items-start gap-3">
-                        <User size={18} className="mt-1 shrink-0" />
-                        <p className="text-sm md:text-base leading-relaxed">{msg.content}</p>
+                        <User size={16} className="mt-1 text-aged-cyan shrink-0" />
+                        <p className="text-sm md:text-base leading-relaxed text-white/90">{msg.content}</p>
                     </div>
                   </div>
                 ) : (
-                  <div className="glass bg-white/[0.02] p-6 md:p-10 rounded-3xl rounded-bl-none">
+                  <div className="glass bg-white/[0.03] p-5 md:p-8 rounded-2xl md:rounded-3xl rounded-bl-none overflow-hidden relative group">
                     <div className="flex justify-between items-center mb-6">
                         <div className="flex items-center gap-2 text-aged-cyan">
-                            <Bot size={20} />
-                            <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest">Autonomous Core x64</span>
+                            <Bot size={18} />
+                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">AGED v4.1 CORE</span>
                         </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => handleCopy(msg.content, idx)} className="w-8 md:w-10 h-8 md:h-10 glass flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all">
-                                {copyStatus === idx ? <Check size={16} className="text-aged-cyan" /> : <Copy size={16} />}
+                        <div className="flex gap-1.5 md:gap-2">
+                             <button onClick={() => handleCopy(msg.content, idx)} title="Copy Content" className="w-8 h-8 md:w-9 md:h-9 glass flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all">
+                                {copyStatus === idx ? <Check size={14} className="text-aged-cyan" /> : <Copy size={14} />}
                             </button>
-                            <button onClick={() => handleDownloadDoc(msg.content, idx)} className="w-8 md:w-10 h-8 md:h-10 glass flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all">
-                                <FileText size={16} />
+                            <button onClick={() => handleDownloadDoc(msg.content, idx)} title="Export DOCX" className="w-8 h-8 md:w-9 md:h-9 glass flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all">
+                                <FileText size={14} />
                             </button>
-                            <button onClick={() => handleDownloadPDF(msg.content)} className="w-8 md:w-10 h-8 md:h-10 glass flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all">
-                                <Download size={16} />
+                            <button onClick={() => handleDownloadPDF(msg.content)} title="Export PDF" className="w-8 h-8 md:w-9 md:h-9 glass flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all">
+                                <Download size={14} />
                             </button>
                         </div>
                     </div>
                     
-                    <div className="prose prose-invert max-w-none prose-p:text-slate-300 prose-headings:text-aged-cyan prose-code:text-aged-cyan prose-code:bg-white/5 prose-code:px-1 prose-code:rounded">
+                    <div className="prose prose-sm md:prose-base prose-invert max-w-none prose-p:text-slate-300 prose-headings:text-white prose-headings:font-bold prose-headings:mb-4 prose-code:text-aged-cyan prose-code:bg-white/5 prose-code:px-1.5 prose-code:rounded">
                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
                           code({ node, inline, className, children, ...props }) {
                             const match = /language-(\w+)/.exec(className || '');
                             return !inline && match ? (
-                              <div className="my-4 rounded-xl overflow-hidden border border-white/10">
-                                <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
+                              <div className="my-4 rounded-xl overflow-hidden border border-white/10 bg-black/40">
+                                <SyntaxHighlighter 
+                                  style={vscDarkPlus} 
+                                  language={match[1]} 
+                                  PreTag="div" 
+                                  customStyle={{ padding: '1.25rem', background: 'transparent' }}
+                                  {...props}
+                                >
                                     {String(children).replace(/\n$/, '')}
                                 </SyntaxHighlighter>
                               </div>
-                            ) : ( <code className="bg-white/10 px-1.5 py-0.5 rounded text-aged-cyan" {...props}>{children}</code> );
+                            ) : ( <code className="bg-white/10 px-1.5 py-0.5 rounded text-aged-cyan text-[0.9em]" {...props}>{children}</code> );
                           }
                         }}
                       >
@@ -333,13 +346,13 @@ function App() {
                     </div>
 
                     {idx === messages.length - 1 && !isStreaming && nextActions.length > 0 && (
-                      <div className="mt-10 pt-8 border-t border-white/10">
-                        <h4 className="flex items-center gap-2 text-aged-cyan text-xs font-bold uppercase tracking-widest mb-4">
-                          <BookOpen size={16} /> Strategic Escalation
+                      <div className="mt-8 pt-6 border-t border-white/5">
+                        <h4 className="flex items-center gap-2 text-aged-cyan text-[10px] font-bold uppercase tracking-[0.2em] mb-4">
+                          <BookOpen size={14} /> Strategic Escalation
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                           {nextActions.map((action, i) => (
-                            <button key={i} className="glass py-2 px-4 text-xs md:text-sm text-left hover:border-aged-cyan transition-all" onClick={() => handleSendMessage(action)}>
+                            <button key={i} className="glass py-2.5 px-4 text-xs text-left hover:border-aged-cyan/50 hover:bg-aged-cyan/5 transition-all text-white/80" onClick={() => handleSendMessage(action)}>
                               {action}
                             </button>
                           ))}
@@ -352,41 +365,46 @@ function App() {
             ))}
 
             {isThinking && (
-              <div className="flex gap-3 items-center text-aged-cyan px-6 py-8">
-                <Loader2 className="animate-spin" size={20} />
-                <span className="text-sm font-medium tracking-wide">Synthesizing Context...</span>
+              <div className="flex gap-3 items-center text-aged-cyan px-4 py-6">
+                <Loader2 className="animate-spin" size={18} />
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em]">Neural Processing...</span>
               </div>
             )}
 
             {error && (
-              <div className="glass p-4 border-l-4 border-red-500 bg-red-500/5 max-w-lg mx-auto">
+              <div className="glass p-4 border-l-4 border-red-500 bg-red-500/5 max-w-lg mx-auto mb-6">
                 <div className="flex items-center gap-3 text-red-500">
                   <AlertCircle size={20} />
-                  <p className="text-sm font-bold uppercase tracking-tight">System Breach: {error}</p>
+                  <p className="text-xs font-bold uppercase tracking-widest">Breach Detected: {error}</p>
                 </div>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 md:p-8 mt-auto">
-            <div className="glass bg-white/5 focus-within:ring-2 focus-within:ring-aged-cyan/50 p-2 md:p-3 flex items-center gap-3 md:gap-4 transition-all">
+          <div className="p-4 md:p-8 mt-auto relative z-10">
+            <div className="glass bg-white/5 border border-white/10 focus-within:border-aged-cyan/50 focus-within:ring-4 focus-within:ring-aged-cyan/5 p-2 md:p-3 flex items-center gap-3 md:gap-4 transition-all duration-300">
               <textarea
                 placeholder={`Query for ${docType === 'auto' ? 'General' : docType} as ${persona}...`}
-                className="flex-1 bg-transparent border-none text-white text-sm md:text-base resize-none outline-none pl-2 md:pl-4 max-h-40"
+                className="flex-1 bg-transparent border-none text-white text-sm md:text-base resize-none outline-none py-2 px-3 md:px-4 max-h-40 min-h-[44px]"
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
+                onChange={(e) => {
+                  setInputText(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                }}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                 rows={1}
               />
               <button 
-                className="bg-aged-cyan text-black w-10 md:w-12 h-10 md:h-12 rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 disabled:opacity-30 disabled:grayscale transition-all"
+                className="bg-aged-cyan text-black w-11 md:w-12 h-11 md:h-12 rounded-xl flex items-center justify-center hover:shadow-[0_0_20px_rgba(0,242,255,0.4)] hover:scale-105 active:scale-95 disabled:opacity-30 disabled:grayscale transition-all shrink-0 shadow-lg"
                 onClick={() => handleSendMessage()}
                 disabled={isStreaming || isThinking || !inputText.trim()}
               >
                 <Send size={20} />
               </button>
             </div>
+            <p className="text-[9px] text-center text-slate-500 mt-3 uppercase tracking-[0.3em] font-medium opacity-50">AGED Integrated Intelligence v4.1 • Secure Core x64</p>
           </div>
         </div>
       </main>
