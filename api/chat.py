@@ -154,4 +154,4 @@ def health_check():
 def root():
     return {"message": "AGED AI Integrated Core is ONLINE"}
 
-handler = app
+# Vercel finds the 'app' variable automatically for FastAPI
