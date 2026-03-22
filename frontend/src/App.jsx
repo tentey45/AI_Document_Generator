@@ -30,9 +30,11 @@ function App() {
   const [tokenCount, setTokenCount] = useState(0);
   const messagesEndRef = useRef(null);
 
-  // Initialize API URL
-  const isLocal = window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1');
-  const API_BASE = (import.meta.env.VITE_API_BASE_URL || (!isLocal ? '/api' : 'http://127.0.0.1:8000')).replace(/\/$/, '');
+  // Initialize API URL - Optimized for cross-device local testing and production deployment
+  const hostname = window.location.hostname;
+  const isLocalDev = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local');
+  
+  const API_BASE = (import.meta.env.VITE_API_BASE_URL || (isLocalDev ? `http://${hostname}:8000` : '/api')).replace(/\/$/, '');
 
   const docOptions = {
     developer: [
@@ -635,7 +637,10 @@ function App() {
                     <AlertCircle size={24} />
                     <p className="text-xs font-black uppercase tracking-widest">Protocol Breach: Communication Failed</p>
                   </div>
-                  <p className="text-sm text-red-400/80 pl-10 underline decoration-dotted">{error}</p>
+                  <p className="text-sm text-red-400/80 mb-4 pl-10 underline decoration-dotted">{error}</p>
+                  <div className="pl-10 text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                    System Note: Ensure backend is running and reachable at <span className="text-aged-cyan">{API_BASE}</span>
+                  </div>
                 </div>
               )}
             </div>
