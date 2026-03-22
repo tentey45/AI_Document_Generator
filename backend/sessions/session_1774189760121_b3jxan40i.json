@@ -1,0 +1,15 @@
+{
+  "session_id": "session_1774189760121_b3jxan40i",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hi"
+    },
+    {
+      "role": "assistant",
+      "content": "how can I help you today"
+    }
+  ],
+  "persona": "developer",
+  "updated_at": 1774189761.210337
+}
