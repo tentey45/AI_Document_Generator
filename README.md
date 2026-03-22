@@ -1,4 +1,4 @@
-# AI Assistant - Claude-like Document Generator
+# AI Assistant - AGED Document Generator
 
 A modern AI assistant that understands user intent and generates adaptive responses for code documentation, academic papers, websites, and more.
 

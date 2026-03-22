@@ -13,13 +13,17 @@
       "use": "@vercel/python",
       "config": {
         "maxLambdaSize": "15mb",
-        "runtime": "python3.9"
+        "runtime": "python3.12"
       }
     }
   ],
   "routes": [
     {
       "src": "/api/chat",
+      "dest": "/api/chat.py"
+    },
+    {
+      "src": "/api/chat-stream",
       "dest": "/api/chat.py"
     },
     {
@@ -30,8 +34,5 @@
       "src": "/(.*)",
       "dest": "/frontend/$1"
     }
-  ],
-  "env": {
-    "PYTHON_VERSION": "3.9"
-  }
+  ]
 }

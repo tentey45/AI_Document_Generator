@@ -1,0 +1,15 @@
+{
+  "session_id": "session_1774172544230_vc997pdz7",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Testing the fixed input container."
+    },
+    {
+      "role": "assistant",
+      "content": "That's a good test, input seems to be working fine."
+    }
+  ],
+  "persona": "developer",
+  "updated_at": 1774172545.6506891
+}

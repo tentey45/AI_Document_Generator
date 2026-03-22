@@ -1,352 +1,694 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Code, GraduationCap, FileText, Copy, Download, Check, AlertCircle, Trash2, Sun, Moon } from 'lucide-react';
+import { Sparkles, Code, GraduationCap, Send, Trash2, Sidebar as SidebarIcon, BookOpen, User, Bot, Loader2, RefreshCw, FileCode, Copy, Download, FileText, Check, AlertCircle, X, Plus, History, LogOut } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus, prism } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+import { saveAs } from 'file-saver';
+
 import './index.css';
+import heroAsset from './assets/hero_ai.png';
+import agedLogo from './assets/aged_logo.png';
+import LandingPage from './components/layout/LandingPage';
 
 function App() {
-  const [userType, setUserType] = useState('developer'); // 'developer' or 'student'
-  const [documentStyle, setDocumentStyle] = useState('professional');
-  const [language, setLanguage] = useState('auto');
-  const [documentType, setDocumentType] = useState('auto');
-  const [message, setMessage] = useState('');
+  // Always start with persona = null so landing page is shown
+  const [persona, setPersona] = useState(null);
+  const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [assistantResponse, setAssistantResponse] = useState(null);
-  const [detectedMode, setDetectedMode] = useState('');
   const [nextActions, setNextActions] = useState([]);
   const [error, setError] = useState(null);
-  const [warning, setWarning] = useState(null);
-  const [copied, setCopied] = useState(false);
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  const [docType, setDocType] = useState('auto');
+  const [copyStatus, setCopyStatus] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [wordCount, setWordCount] = useState(0);
+  const [tokenCount, setTokenCount] = useState(0);
   const messagesEndRef = useRef(null);
 
+  // Initialize API URL - Optimized for cross-device local testing and production deployment
+  const hostname = window.location.hostname;
+  const isLocalDev = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local');
+  
+  const API_BASE = (import.meta.env.VITE_API_BASE_URL || (isLocalDev ? `http://${hostname}:8000` : '/api')).replace(/\/$/, '');
+
+  const docOptions = {
+    developer: [
+      { value: 'auto', label: 'Auto-detect' },
+      { value: 'README.md', label: 'README.md' },
+      { value: 'Technical Spec', label: 'Technical Spec' },
+      { value: 'API Reference', label: 'API Reference' },
+      { value: 'Project Status', label: 'Project Status' }
+    ],
+    learner: [
+      { value: 'auto', label: 'Auto-detect' },
+      { value: 'Code Discovery', label: 'Code Discovery' },
+      { value: 'Line-by-Line Analysis', label: 'Line-by-Line Analysis' },
+      { value: 'High-Level Overview', label: 'High-Level Overview' },
+      { value: 'Step-by-Step Tutorial', label: 'Step-by-Step Tutorial' }
+    ]
+  };
+
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isStreaming]);
 
-  const toggleTheme = () => setTheme(theme === 'light' ? 'dark' : 'light');
-
-  const handleUserTypeChange = (newType) => {
-    setUserType(newType);
-    setLanguage('auto');
-    setDocumentType('auto');
-    setWarning(null);
-    setError(null);
-  };
-
-  const handleMessageChange = (e) => {
-    const val = e.target.value;
-    setMessage(val);
-
-    // Smart validation
-    if (userType === 'student' && (val.includes('function ') || val.includes('class ') || val.includes('const ') || val.includes('def '))) {
-      setWarning('Your input looks like code. Switch to Developer mode for better assistance!');
-    } else if (userType === 'developer' && val.includes('<html') && val.includes('</html>')) {
-      setWarning('This looks like HTML. Consider using website generation mode.');
-    } else {
-      setWarning(null);
+  // Fetch session list when persona changes
+  useEffect(() => {
+    if (persona) {
+      fetchSessions();
+      // Reset stats and messages when switching persona
+      setWordCount(0);
+      setTokenCount(0);
+      if (!currentSessionId) {
+        setMessages([]);
+      }
     }
+  }, [persona]);
+
+  const fetchSessions = async () => {
+    try {
+      const resp = await fetch(`${API_BASE}/sessions?persona=${persona}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setSessions(data);
+        // Calculate total tokens used in this persona across all sessions
+        const used = data.reduce((acc, s) => acc + (s.token_count || 0), 0);
+        setTokenCount(used);
+      }
+    } catch (e) { console.error("History fetch failed", e); }
   };
 
-  const clearConversation = () => {
-    setMessage('');
-    setAssistantResponse(null);
-    setDetectedMode('');
-    setNextActions([]);
-    setError(null);
-    setWarning(null);
+  const handleNewChat = () => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    setIsSidebarOpen(false);
   };
 
-  const handleSendMessage = async () => {
-    if (!message.trim()) {
-      setError('Please enter a message.');
-      return;
-    }
+  const selectSession = async (id) => {
+    try {
+      const resp = await fetch(`${API_BASE}/sessions/${id}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setMessages(data.messages || []);
+        setCurrentSessionId(id);
+        setIsSidebarOpen(false);
+      }
+    } catch (e) { setError("Failed to load session history."); }
+  };
 
+  const deleteSession = async (e, id) => {
+    e.stopPropagation();
+    try {
+      if (await fetch(`${API_BASE}/sessions/${id}`, { method: 'DELETE' })) {
+        if (currentSessionId === id) handleNewChat();
+        fetchSessions();
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleSendMessage = async (textOverride = null) => {
+    const text = textOverride || inputText;
+    if (!text.trim() || isStreaming) return;
+
+    const userMessage = { role: 'user', content: text };
+    setMessages(prev => [...prev, userMessage]);
+
+    // Simple word count and token estimation
+    setWordCount(text.trim().split(/\s+/).length);
+    setTokenCount(prev => prev + Math.ceil(text.length / 4));
+
+    setInputText('');
     setIsThinking(true);
     setError(null);
-    setAssistantResponse(null);
-    setDetectedMode('');
     setNextActions([]);
 
-    try {
-      const preferences = {
-        doc_style: documentStyle,
-        language: language,
-        doc_type: documentType
-      };
+    let activeSessionId = currentSessionId;
+    if (!activeSessionId) {
+      activeSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setCurrentSessionId(activeSessionId);
+    }
 
-      // Use Vercel/Render env variable, fallback to '/api' for local Vite proxy
-      const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'; 
-      const response = await fetch(`${API_BASE_URL}/chat`, {
+    try {
+      const response = await fetch(`${API_BASE}/chat-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: message,
-          user_context: userType,
-          preferences: preferences
+          message: text,
+          user_context: persona,
+          session_id: activeSessionId,
+          preferences: {
+            theme: 'futuristic',
+            high_fidelity: true,
+            doc_type: docType
+          }
         }),
       });
 
-      // SAFE RESPONSE HANDLING
-      const responseText = await response.text();
-      let data;
-      
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseErr) {
-        // If not JSON, it's likely a text error from the server/load balancer
-        throw new Error(responseText || `Server returned ${response.status} ${response.statusText}`);
-      }
-
       if (!response.ok) {
-        throw new Error(data.detail || data.error || 'Failed to connect to AI assistant.');
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail?.message || errData.detail || 'Connection failed');
       }
 
-      setAssistantResponse(data.content);
-      setDetectedMode(data.detected_mode);
-      setNextActions(data.next_actions || []);
-      setWarning(null);
-      
-      // Auto-scroll to response
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-    } catch (err) {
-      console.error('AI Error:', err);
-      setError(err.message);
-    } finally {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let aiResponseText = '';
+      let done = false;
+
       setIsThinking(false);
+      setIsStreaming(true);
+
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+
+        if (value) {
+          const chunk = decoder.decode(value, { stream: true });
+          aiResponseText += chunk;
+
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1].content = aiResponseText;
+            return newMessages;
+          });
+        }
+      }
+
+      setIsStreaming(false);
+      // Refresh session list after a chat
+      fetchSessions();
+
+      if (aiResponseText.includes("**Next Steps:**")) {
+        const parts = aiResponseText.split("**Next Steps:**");
+        const stepsSection = parts[1].trim();
+        const extractedSteps = stepsSection
+          .split('\n')
+          .filter(line => line.trim().match(/^[1-3]\./))
+          .map(line => line.trim().replace(/^[1-3]\.\s*/, ''))
+          .filter(Boolean);
+        setNextActions(extractedSteps.slice(0, 3));
+      }
+
+    } catch (err) {
+      setError(err.message);
+      setIsThinking(false);
+      setIsStreaming(false);
     }
   };
 
-  const handleCopy = () => {
-    if (!assistantResponse) return;
-    navigator.clipboard.writeText(assistantResponse).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  const handleCopy = (text, idx) => {
+    const contentLines = text.split('**Next Steps:**')[0].trim().split('\n');
+    const cleanLines = contentLines.map(line => {
+      let l = line.trim();
+      l = l.replace(/^[#]+\s+/, '');
+      l = l.replace(/^[\*\-\+]\s+/, '• ');
+      l = l.replace(/\*\*(.*?)\*\*/g, '$1');
+      l = l.replace(/`(.*?)`/g, '$1');
+      return l;
+    });
+
+    navigator.clipboard.writeText(cleanLines.join('\n')).then(() => {
+      setCopyStatus(idx);
+      setTimeout(() => setCopyStatus(null), 2000);
     });
   };
 
-  const handleDownload = () => {
-    if (!assistantResponse) return;
-    const blob = new Blob([assistantResponse], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `AI_Response_${userType}_${new Date().getTime()}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleDownloadPDF = (content) => {
+    const printWindow = window.open('', '_blank');
+    const cleanContent = content.split('**Next Steps:**')[0].trim();
+
+    // Formatting the content with modern typography and structured blocks
+    const formattedContent = cleanContent
+      .replace(/^# (.*$)/gim, '<div class="hero-section"><h1 class="main-title">$1</h1><div class="accent-bar"></div></div>')
+      .replace(/^## (.*$)/gim, '<h2 class="section-title">$1</h2>')
+      .replace(/^### (.*$)/gim, '<h3 class="subsection-title">$1</h3>')
+      .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+      .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
+      // Custom List Items
+      .replace(/^ - (.*$)/gim, '<li class="list-item">$1</li>')
+      .replace(/^ \* (.*$)/gim, '<li class="list-item">$1</li>')
+      .replace(/\n\n/gim, '</p><p class="content-text">')
+      .replace(/\n/gim, '<br>');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+          <style>
+            :root {
+              --primary: #0084FF;
+              --dark: #121217;
+              --gray-light: #F8F9FA;
+              --gray-medium: #E9ECEF;
+              --gray-text: #495057;
+            }
+            * { box-sizing: border-box; }
+            body { 
+              font-family: 'Inter', sans-serif; 
+              padding: 60px 80px; 
+              color: var(--dark); 
+              line-height: 1.6; 
+              max-width: 900px; 
+              margin: 0 auto; 
+              background: #fff;
+            }
+            .meta-header {
+              font-size: 10px;
+              color: #ADB5BD;
+              text-transform: uppercase;
+              letter-spacing: 0.15em;
+              margin-bottom: 50px;
+              display: flex;
+              justify-content: space-between;
+              border-bottom: 1px solid var(--gray-medium);
+              padding-bottom: 10px;
+            }
+            .hero-section {
+              margin-bottom: 40px;
+              position: relative;
+            }
+            .main-title {
+              font-family: 'Outfit', sans-serif;
+              font-size: 38px;
+              font-weight: 700;
+              margin: 0 0 15px 0;
+              color: var(--dark);
+              line-height: 1.1;
+            }
+            .accent-bar {
+              height: 4px;
+              width: 60px;
+              background: var(--primary);
+              border-radius: 2px;
+            }
+            .section-title {
+              font-family: 'Outfit', sans-serif;
+              font-size: 22px;
+              font-weight: 700;
+              margin-top: 45px;
+              margin-bottom: 20px;
+              color: var(--dark);
+              border-bottom: 2px solid var(--gray-light);
+              padding-bottom: 8px;
+            }
+            .subsection-title {
+              font-size: 16px;
+              font-weight: 600;
+              margin-top: 30px;
+              margin-bottom: 10px;
+              color: var(--primary);
+            }
+            .content-text {
+              margin: 0 0 1.5em 0;
+              color: var(--gray-text);
+              font-size: 14.5px;
+            }
+            .inline-code {
+              font-family: monospace;
+              background: var(--gray-light);
+              color: #D63384;
+              padding: 2px 5px;
+              border-radius: 4px;
+              font-size: 0.9em;
+            }
+            .list-item {
+              margin-bottom: 8px;
+              list-style: none;
+              position: relative;
+              padding-left: 20px;
+              font-size: 14.5px;
+              color: var(--gray-text);
+            }
+            .list-item::before {
+              content: "•";
+              color: var(--primary);
+              font-weight: bold;
+              position: absolute;
+              left: 0;
+            }
+            @media print {
+              body { padding: 40px; font-size: 12pt; }
+              .meta-header { position: absolute; top: 20px; width: calc(100% - 80px); }
+              .hero-section { page-break-after: avoid; }
+              h2, h3 { page-break-after: avoid; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="meta-header">
+            <span>PERSONA: ${persona.toUpperCase()}</span>
+            <span>DATE: ${new Date().toLocaleDateString()}</span>
+            <span>AGED AI DOC ARCHITECT</span>
+          </div>
+          <div class="content-wrapper">
+            <p class="content-text">${formattedContent}</p>
+          </div>
+          <footer style="margin-top: 100px; text-align: center; font-size: 10px; color: #ADB5BD; border-top: 1px solid var(--gray-medium); padding-top: 20px;">
+            AGED (Artificial Intelligence Document & Design Engine) - Professional Series
+          </footer>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 800);
   };
 
-  return (
-    <div className="app-container">
-      <header>
-        <div className="logo">
-          <Sparkles size={28} style={{ color: 'var(--accent-primary)' }} />
-          <h1>A<span>GEN</span></h1>
-        </div>
-        <div className="nav-actions">
-          <button className="theme-btn" onClick={toggleTheme} title="Toggle Theme">
-            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-          </button>
-          <button className="theme-btn" onClick={clearConversation} title="Clear Conversation">
-            <Trash2 size={20} />
-          </button>
-        </div>
-      </header>
+  const handleDownloadDoc = (content, index) => {
+    const lines = content.split('**Next Steps:**')[0].trim().split('\n');
+    const paragraphs = lines.map(line => {
+      const text = line.trim();
+      if (text.startsWith('# ')) return new Paragraph({ text: text.replace('# ', ''), heading: HeadingLevel.HEADING_1 });
+      if (text.startsWith('## ')) return new Paragraph({ text: text.replace('## ', ''), heading: HeadingLevel.HEADING_2 });
+      const runs = [];
+      const regex = /(\*\*.*?\*\*|`.*?`)/g;
+      let match, lastIdx = 0;
+      while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIdx) runs.push(new TextRun(text.slice(lastIdx, match.index)));
+        const chunk = match[0];
+        if (chunk.startsWith('**')) runs.push(new TextRun({ text: chunk.replace(/\*\*/g, ''), bold: true }));
+        else if (chunk.startsWith('`')) runs.push(new TextRun({ text: chunk.replace(/`/g, ''), color: "0056B3" }));
+        lastIdx = regex.lastIndex;
+      }
+      if (lastIdx < text.length) runs.push(new TextRun(text.slice(lastIdx)));
+      return new Paragraph({ children: runs.length > 0 ? runs : [new TextRun(text)] });
+    });
+    const doc = new Document({ sections: [{ children: paragraphs }] });
+    Packer.toBlob(doc).then(blob => saveAs(blob, `AGED_Export_${index}.docx`));
+  };
 
-      <main className="assistant-layout">
-        {/* Left Sidebar */}
-        <aside className="settings-sidebar">
-          <div className="sidebar-section">
-            <h3>User Type</h3>
-            <div className="user-type-switch">
+  if (!persona) {
+    return <LandingPage onSelect={(mode) => setPersona(mode)} />;
+  } return (
+    <div className="flex flex-col md:flex-row h-screen w-screen p-0 md:p-4 gap-0 md:gap-4 overflow-hidden">
+      {/* Mobile Header */}
+      <div className="md:hidden flex items-center justify-between p-4 glass rounded-none border-t-0 border-x-0 relative z-50">
+        <div className="flex items-center gap-2">
+           <img src={agedLogo} alt="AGED" className="w-6 h-6 rounded-md object-cover mix-blend-screen" />
+        </div>
+      </div>
+
+      {/* Sidebar - Animated Mobile Overlay */}
+      <aside className={`
+        fixed md:relative z-50 inset-y-0 left-0 w-[280px] md:w-[280px] 
+        glass shadow-2xl md:shadow-none p-6 flex flex-col shrink-0 
+        transition-all duration-300 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full md:w-0 md:px-0 md:opacity-0 pointer-events-none'}
+      `}>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+             <div className="w-8 h-8 rounded-lg overflow-hidden border border-aged-cyan/50 shadow-[0_0_15px_rgba(0,242,255,0.3)]">
+                <img src={agedLogo} alt="AGED" className="w-full h-full object-cover" />
+             </div>
+            <h2 className="text-lg font-bold">AGED CORE</h2>
+          </div>
+          <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-6 flex-1">
+          <div className="glass p-4 border-l-4 border-aged-cyan">
+            <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">Active Persona</p>
+            <h4 className="capitalize font-bold text-aged-cyan">{persona}</h4>
+          </div>
+
+          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
+              <History size={12} /> Chat History
+            </p>
+            <div className="flex flex-col gap-2">
               <button 
-                className={`user-type-btn ${userType === 'developer' ? 'active' : ''}`}
-                onClick={() => handleUserTypeChange('developer')}
+                onClick={handleNewChat}
+                className="w-full text-left p-3 rounded-xl border border-white/5 hover:border-aged-cyan/30 bg-white/5 hover:bg-white/10 transition-all text-xs font-semibold flex items-center gap-3 group"
               >
-                <Code size={18} /> Developer
+                <Plus size={14} className="text-aged-cyan" />
+                <span>New Chat</span>
               </button>
-              <button 
-                className={`user-type-btn ${userType === 'student' ? 'active' : ''}`}
-                onClick={() => handleUserTypeChange('student')}
-              >
-                <GraduationCap size={18} /> Student
-              </button>
+              
+              {sessions.map(s => (
+                <div key={s.id} className="group relative">
+                  <button 
+                    onClick={() => selectSession(s.id)}
+                    className={`w-full text-left p-3 rounded-xl border transition-all text-[11px] leading-relaxed flex flex-col gap-1 pr-10
+                      ${currentSessionId === s.id ? 'bg-aged-cyan/10 border-aged-cyan/30 text-white' : 'bg-transparent border-white/5 text-slate-400 hover:bg-white/5'}
+                    `}
+                  >
+                    <span className="font-bold truncate w-full">{s.title}</span>
+                    <span className="text-[9px] opacity-40 uppercase tracking-tighter">
+                      {new Date(s.updated_at * 1000).toLocaleDateString()}
+                    </span>
+                  </button>
+                  <button 
+                    onClick={(e) => deleteSession(e, s.id)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 opacity-0 group-hover:opacity-100 hover:text-red-400 text-slate-500 transition-all"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="sidebar-section">
-            <h3>Preferences</h3>
-            {userType === 'developer' ? (
-              <>
-                <div className="form-group">
-                  <label>Document Style</label>
-                  <select value={documentStyle} onChange={(e) => setDocumentStyle(e.target.value)}>
-                    <option value="developer">Developer Style</option>
-                    <option value="professional">Professional Style</option>
-                    <option value="simple">Simple Style</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Programming Language</label>
-                  <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-                    <option value="auto">Auto Detect</option>
-                    <option value="python">Python</option>
-                    <option value="javascript">JavaScript</option>
-                    <option value="java">Java</option>
-                    <option value="cpp">C++</option>
-                  </select>
-                </div>
-              </>
-            ) : (
-              <div className="form-group">
-                <label>Document Type</label>
-                <select value={documentType} onChange={(e) => setDocumentType(e.target.value)}>
-                  <option value="auto">Auto Detect</option>
-                  <option value="academic">Academic</option>
-                  <option value="proposal">Proposal</option>
-                  <option value="defense">Defense</option>
-                  <option value="professional">Professional</option>
-                  <option value="simple">Simple</option>
-                </select>
-              </div>
+          <div className="mt-6 flex flex-col gap-3">
+            <button onClick={() => { setPersona(null); setCurrentSessionId(null); setIsSidebarOpen(false); }} className="glass py-2.5 flex items-center justify-center gap-2 text-xs font-semibold hover:border-red-500/50 hover:text-red-400 transition-all">
+              <LogOut size={14} /> Exit Workspace
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Click overlay for mobile sidebar */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-black/5">
+        
+        {/* Navigation / Control Bar */}
+        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-30 pointer-events-none">
+          <div className="flex items-center gap-2 pointer-events-auto">
+            {!isSidebarOpen && (
+              <button 
+                onClick={() => setIsSidebarOpen(true)} 
+                className="p-2 glass bg-white/5 border-white/10 hover:border-aged-cyan text-aged-cyan hover:text-white transition-all rounded-full"
+                title="Open Sidebar"
+              >
+                <SidebarIcon size={18} />
+              </button>
             )}
           </div>
-        </aside>
+          
+          <button 
+            onClick={() => setPersona(null)} 
+            className="pointer-events-auto p-2 glass bg-white/5 border-white/10 hover:border-aged-cyan text-white/50 hover:text-white transition-all rounded-full flex items-center gap-2 group"
+          >
+            <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" />
+            <span className="text-[10px] font-bold tracking-widest hidden md:inline">EXIT WORKSPACE</span>
+          </button>
+        </div>
 
-        {/* Main Workspace */}
-        <div className="main-workspace">
-          {/* Response Area */}
-          <div className="response-container">
-            {detectedMode && (
-              <div className="detected-mode">
-                <span className="mode-label">Mode:</span>
-                <span className="mode-value">{detectedMode}</span>
-              </div>
-            )}
-            
-            <div className="response-content">
-              {error ? (
-                <div className="error-message">
-                  <AlertCircle size={24} />
-                  <div>
-                    <strong>Error:</strong> {error}
+        <div className="flex-1 flex flex-col overflow-hidden m-0 md:rounded-tl-2xl relative z-10 transition-all duration-500">
+          <div className="flex-1 overflow-y-auto px-4 md:px-0 space-y-10 scroll-smooth custom-scrollbar mt-14 md:mt-20">
+            {/* Centered Document Workspace */}
+            <div className="max-w-4xl mx-auto w-full pb-32">
+              
+              {messages.length === 0 && !isThinking && (
+                <div className="h-[60vh] flex flex-col items-center justify-center opacity-60 text-center px-6 transition-all duration-700">
+                  <div className="relative mb-10 transform scale-125">
+                    <div className="absolute inset-0 bg-aged-cyan/20 blur-[80px] rounded-full animate-pulse"></div>
+                    <img src={agedLogo} alt="AGED" className="w-24 h-24 md:w-32 md:h-32 object-cover relative z-10 filter drop-shadow-[0_0_30px_rgba(0,242,255,0.4)] mix-blend-screen" />
+                  </div>
+                  <h2 className="text-3xl md:text-5xl font-black tracking-tight text-white mb-6">Document Architect</h2>
+                  <p className="text-base md:text-lg text-slate-300 mt-2 max-w-sm mx-auto leading-relaxed font-medium">
+                    Paste your code for documentation or describe what you want to create.
+                  </p>
+                  <div className="mt-8 px-4 py-2 rounded-full glass bg-aged-cyan/5 border-aged-cyan/20 text-[11px] text-aged-cyan font-bold tracking-[0.2em] uppercase">
+                    Initialize System Protocol: {persona?.toUpperCase()}
                   </div>
                 </div>
-              ) : isThinking ? (
-                <div className="thinking-indicator">
-                  <div className="thinking-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </div>
-                  <p>AI is thinking...</p>
-                </div>
-              ) : assistantResponse ? (
-                <>
-                  <div className="response-text">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        code({ node, inline, className, children, ...props }) {
-                          const match = /language-(\w+)/.exec(className || '');
-                          return !inline && match ? (
-                            <SyntaxHighlighter
-                              style={theme === 'dark' ? vscDarkPlus : prism}
-                              language={match[1]}
-                              PreTag="div"
-                              {...props}
-                            >
-                              {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                          ) : (
-                            <code className={className} {...props}>
-                              {children}
-                            </code>
-                          );
-                        }
-                      }}
-                    >
-                      {assistantResponse}
-                    </ReactMarkdown>
-                  </div>
-                  
-                  {/* Next Actions */}
-                  {nextActions.length > 0 && (
-                    <div className="next-actions">
-                      <h4>Suggested Next Steps</h4>
-                      <div className="action-buttons">
-                        {nextActions.map((action, index) => (
-                          <button key={index} className="action-btn" onClick={() => setMessage(action)}>
-                            {action}
-                          </button>
-                        ))}
+              )}
+
+              {messages.map((msg, idx) => {
+                // Extract intent analysis if it exists
+                let displayContent = msg.content;
+                let intentAnalysis = null;
+                const intentMatch = displayContent.match(/<intent>(.*?)<\/intent>/s);
+                if (intentMatch) {
+                  intentAnalysis = intentMatch[1].trim();
+                  displayContent = displayContent.replace(intentMatch[0], '').trim();
+                }
+
+                return (
+                  <div key={idx} className={`mb-10 animate-message-in ${msg.role === 'user' ? 'max-w-2xl ml-auto' : 'w-full'}`}>
+                    {msg.role === 'user' ? (
+                      <div className="bg-aged-cyan/10 border border-aged-cyan/20 px-6 py-4 rounded-3xl rounded-br-none shadow-[0_0_20px_rgba(0,242,255,0.03)] backdrop-blur-sm">
+                        <div className="flex items-start gap-4">
+                          <User size={18} className="mt-1.5 text-aged-cyan shrink-0" />
+                          <p className="text-sm md:text-base leading-relaxed text-white/90 font-medium">{displayContent}</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="empty-state">
-                  <FileText size={64} style={{ opacity: 0.2 }} />
-                  <p>Ask me anything! </p>
+                    ) : (
+                      <div className="relative group">
+                        {/* Thinking Layer - 1-2 lines intent */}
+                        {intentAnalysis && (
+                          <div className="mb-4 bg-white/[0.03] border border-white/5 rounded-2xl p-4 flex items-center gap-3 animate-message-in">
+                            <Bot size={14} className="text-aged-cyan/50" />
+                            <div className="flex-1">
+                              <p className="text-[10px] font-bold text-aged-cyan/40 uppercase tracking-[0.2em] mb-0.5">AGED Intent Analysis</p>
+                              <p className="text-[11px] italic text-slate-400 leading-relaxed font-medium">"{intentAnalysis}"</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Document Result - Canva Style */}
+                        <div className="glass bg-white/[0.02] border-white/5 p-6 md:p-12 rounded-[2rem] rounded-bl-none overflow-hidden relative shadow-2xl">
+                          <div className="flex justify-between items-center mb-10 pb-6 border-bottom border-white/5">
+                            <div className="flex items-center gap-3 text-aged-cyan">
+                              <Bot size={22} className="opacity-80" />
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-black uppercase tracking-[0.25em] opacity-50">AGED INTELLIGENCE</span>
+                                <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">{persona.toUpperCase()} MODE</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => handleCopy(displayContent, idx)} title="Copy" className="w-10 h-10 glass bg-white/5 border-white/10 flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all rounded-xl">
+                                {copyStatus === idx ? <Check size={16} className="text-aged-cyan" /> : <Copy size={16} />}
+                              </button>
+                              <button onClick={() => handleDownloadPDF(displayContent)} title="PDF" className="w-10 h-10 glass bg-white/5 border-white/10 flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all rounded-xl">
+                                <Download size={16} />
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <div className="prose-canva">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                              code({ node, inline, className, children, ...props }) {
+                                const match = /language-(\w+)/.exec(className || '');
+                                return !inline && match ? (
+                                  <div className="my-8 rounded-2xl overflow-hidden border border-white/10 bg-black/60 shadow-inner">
+                                    <div className="bg-white/5 px-4 py-2 flex items-center justify-between border-b border-white/5">
+                                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{match[1]} SOURCE</span>
+                                      <div className="flex gap-1.5"><div className="w-2 h-2 rounded-full bg-red-400/30"></div><div className="w-2 h-2 rounded-full bg-yellow-400/30"></div><div className="w-2 h-2 rounded-full bg-green-400/30"></div></div>
+                                    </div>
+                                    <SyntaxHighlighter
+                                      style={vscDarkPlus}
+                                      language={match[1]}
+                                      PreTag="div"
+                                      customStyle={{ padding: '2rem', background: 'transparent', fontSize: '13px' }}
+                                      {...props}
+                                    >
+                                      {String(children).replace(/\n$/, '')}
+                                    </SyntaxHighlighter>
+                                  </div>
+                                ) : (<code className="bg-aged-cyan/10 px-2 py-0.5 rounded text-aged-cyan text-[0.85em] font-mono border border-aged-cyan/20" {...props}>{children}</code>);
+                              }
+                            }}
+                            >
+                              {displayContent}
+                            </ReactMarkdown>
+                          </div>
+
+                          {idx === messages.length - 1 && !isStreaming && nextActions.length > 0 && (
+                            <div className="mt-16 pt-10 border-t border-white/5">
+                              <h4 className="flex items-center gap-2 text-aged-cyan text-[10px] font-black uppercase tracking-[0.2em] mb-6">
+                                <BookOpen size={16} className="opacity-70" /> Strategic Escalation
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {nextActions.map((action, i) => (
+                                  <button key={i} className="glass py-4 px-5 text-[11px] font-bold text-left hover:border-aged-cyan/50 hover:bg-aged-cyan/5 transition-all text-white/50 hover:text-white rounded-2xl border-white/5" onClick={() => handleSendMessage(action)}>
+                                    {action}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {isThinking && (
+                <div className="flex gap-4 items-center text-aged-cyan px-2 py-8 animate-pulse">
+                  <div className="relative">
+                    <Loader2 className="animate-spin text-aged-cyan/50" size={24} />
+                    <Bot size={12} className="absolute inset-0 m-auto text-aged-cyan" />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Architectural Processing...</span>
+                </div>
+              )}
+
+              {error && (
+                <div className="glass p-6 border-l-4 border-red-500 bg-red-500/5 max-w-2xl mx-auto my-12 animate-shake">
+                  <div className="flex items-center gap-4 text-red-500 mb-2">
+                    <AlertCircle size={24} />
+                    <p className="text-xs font-black uppercase tracking-widest">Protocol Breach: Communication Failed</p>
+                  </div>
+                  <p className="text-sm text-red-400/80 mb-4 pl-10 underline decoration-dotted">{error}</p>
+                  <div className="pl-10 text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                    System Note: Ensure backend is running and reachable at <span className="text-aged-cyan">{API_BASE}</span>
+                  </div>
                 </div>
               )}
             </div>
-            
-            {/* Response Actions */}
-            {assistantResponse && (
-              <div className="response-actions">
-                <button className="action-btn secondary" onClick={handleCopy}>
-                  {copied ? <Check size={18} /> : <Copy size={18} />}
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-                <button className="action-btn secondary" onClick={handleDownload}>
-                  <Download size={18} /> Download
+          </div>
+
+          <div className="sticky bottom-0 p-4 md:p-10 z-30 transition-all duration-500 mt-auto bg-gradient-to-t from-black via-black/80 to-transparent">
+            <div className="max-w-4xl mx-auto w-full relative">
+              <div className="glass bg-white/5 border-white/10 focus-within:border-aged-cyan/40 focus-within:bg-white/10 p-2 md:p-3 flex items-end gap-3 transition-all duration-500 rounded-3xl shadow-2xl relative">
+                <textarea
+                  placeholder={persona === 'developer' ? "Paste code or describe the document to generate..." : "Paste code and ask what you want to understand..."}
+                  className="flex-1 bg-transparent border-none text-white text-sm md:text-base resize-none outline-none py-3 px-4 md:px-5 max-h-60 min-h-[56px] font-medium leading-relaxed custom-scrollbar"
+                  value={inputText}
+                  onChange={(e) => {
+                    setInputText(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 240)}px`;
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                  rows={1}
+                />
+                <button
+                  className="bg-aged-cyan text-black w-12 md:w-14 h-12 md:h-14 rounded-2xl flex items-center justify-center send-button-glow disabled:opacity-30 disabled:grayscale transition-all shrink-0 mb-1"
+                  onClick={() => handleSendMessage()}
+                  disabled={isStreaming || isThinking || !inputText.trim()}
+                >
+                  <Send size={22} fill="currentColor" />
                 </button>
               </div>
-            )}
-          </div>
-          
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input Area */}
-        <div className="input-area">
-          {warning && (
-            <div className="warning-message">
-              <AlertCircle size={18} />
-              <span>{warning}</span>
+              
+              {/* Feedback subtle counters */}
+              <div className="mt-5 px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex gap-6 text-[11px] font-bold uppercase tracking-widest text-white/60">
+                  <span className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-aged-cyan shadow-[0_0_10px_rgba(0,242,255,0.8)]"></div> 
+                    Words: {wordCount}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-aged-cyan shadow-[0_0_10px_rgba(0,242,255,0.8)]"></div> 
+                    Tokens left: {Math.max(0, 50000 - tokenCount).toLocaleString()} / 50,000
+                  </span>
+                </div>
+                {inputText.length === 0 && messages.length > 0 && (
+                  <p className="text-[10px] text-aged-cyan/50 italic font-medium">
+                    Tip: Paste code for documentation or describe what you want to create.
+                  </p>
+                )}
+              </div>
             </div>
-          )}
-          
-          <div className="input-container">
-            <textarea 
-              className="message-input"
-              placeholder="Ask me anything!"
-              value={message}
-              onChange={handleMessageChange}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-            />
-            <button 
-              className="send-button" 
-              onClick={handleSendMessage}
-              disabled={isThinking || !message.trim()}
-            >
-              <Sparkles size={20} />
-              {isThinking ? 'Thinking...' : 'Send'}
-            </button>
           </div>
         </div>
       </main>
