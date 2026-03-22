@@ -58,68 +58,64 @@ function App() {
   }, [messages, isStreaming]);
 
   // --- PERSISTENCE HOOKS ---
-  // Load state from localStorage on initial mount
+  // Save current state to persona-specific keys whenever it changes
   useEffect(() => {
-    const savedPersona = localStorage.getItem('aged_persona');
-    const savedSessionId = localStorage.getItem('aged_current_session_id');
-    const savedInputText = localStorage.getItem('aged_input_text');
-    const savedMessages = localStorage.getItem('aged_messages');
+    if (!persona) return;
+    
+    if (currentSessionId) {
+      localStorage.setItem(`aged_session_id_${persona}`, currentSessionId);
+    } else {
+      localStorage.removeItem(`aged_session_id_${persona}`);
+    }
+    
+    if (messages.length > 0) {
+      localStorage.setItem(`aged_messages_${persona}`, JSON.stringify(messages));
+    } else {
+      localStorage.removeItem(`aged_messages_${persona}`);
+    }
+    
+    localStorage.setItem(`aged_input_text_${persona}`, inputText);
+    localStorage.setItem('aged_active_persona', persona);
+  }, [persona, currentSessionId, messages, inputText]);
 
-    if (savedPersona) setPersona(savedPersona);
+  // Load state when persona is initialized/changed
+  useEffect(() => {
+    if (!persona) return;
+
+    const savedSessionId = localStorage.getItem(`aged_session_id_${persona}`);
+    const savedMessages = localStorage.getItem(`aged_messages_${persona}`);
+    const savedInputText = localStorage.getItem(`aged_input_text_${persona}`);
+
     if (savedSessionId) setCurrentSessionId(savedSessionId);
-    if (savedInputText) setInputText(savedInputText);
+    else setCurrentSessionId(null);
+
     if (savedMessages) {
       try { setMessages(JSON.parse(savedMessages)); }
-      catch (e) { console.error("Failed to parse saved messages", e); }
+      catch (e) { setMessages([]); }
+    } else {
+      setMessages([]);
     }
+
+    if (savedInputText) setInputText(savedInputText);
+    else setInputText('');
+
+    fetchSessions();
+  }, [persona]);
+
+  // Initial load of the active persona on boot
+  useEffect(() => {
+    const activePersona = localStorage.getItem('aged_active_persona');
+    if (activePersona) setPersona(activePersona);
   }, []);
 
-  // Sync persona and sessionId to localStorage
-  useEffect(() => {
-    if (persona) localStorage.setItem('aged_persona', persona);
-    else localStorage.removeItem('aged_persona');
-  }, [persona]);
-
-  useEffect(() => {
-    if (currentSessionId) localStorage.setItem('aged_current_session_id', currentSessionId);
-    else localStorage.removeItem('aged_current_session_id');
-  }, [currentSessionId]);
-
-  // Sync inputText to localStorage
-  useEffect(() => {
-    localStorage.setItem('aged_input_text', inputText);
-  }, [inputText]);
-
-  // Sync messages to localStorage
-  useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem('aged_messages', JSON.stringify(messages));
-    } else {
-      localStorage.removeItem('aged_messages');
-    }
-  }, [messages]);
-
-  // Fetch session list when persona changes
-  useEffect(() => {
-    if (persona) {
-      fetchSessions();
-      // Only reset if no messages found in local storage
-      const savedMessages = localStorage.getItem('aged_messages');
-      if (!currentSessionId && !savedMessages) {
-        setMessages([]);
-        setWordCount(0);
-        setTokenCount(0);
-      }
-    }
-  }, [persona]);
-
+  // Fetch session list
   const fetchSessions = async () => {
+    if (!persona) return;
     try {
       const resp = await fetch(`${API_BASE}/sessions?persona=${persona}`);
       if (resp.ok) {
         const data = await resp.json();
         setSessions(data);
-        // Calculate total tokens used in this persona across all sessions
         const used = data.reduce((acc, s) => acc + (s.token_count || 0), 0);
         setTokenCount(used);
       }
@@ -129,8 +125,8 @@ function App() {
   const handleNewChat = () => {
     setCurrentSessionId(null);
     setMessages([]);
-    localStorage.removeItem('aged_messages');
-    localStorage.removeItem('aged_current_session_id');
+    localStorage.removeItem(`aged_messages_${persona}`);
+    localStorage.removeItem(`aged_session_id_${persona}`);
     setIsSidebarOpen(false);
   };
 
