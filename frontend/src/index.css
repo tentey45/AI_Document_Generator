@@ -11,10 +11,7 @@
 
 @layer base {
   body {
-    @apply bg-aged-dark text-white antialiased;
-    background-image: 
-      radial-gradient(circle at 0% 0%, rgba(0, 242, 255, 0.05) 0%, transparent 50%),
-      radial-gradient(circle at 100% 100%, rgba(157, 78, 221, 0.05) 0%, transparent 50%);
+    @apply bg-black text-white antialiased;
     margin: 0;
     padding: 0;
     min-height: 100vh;
@@ -23,22 +20,213 @@
 
 @layer components {
   .glass {
-    @apply bg-aged-card backdrop-blur-xl border border-white/10 rounded-2xl;
+    @apply bg-aged-card backdrop-blur-3xl border border-white/10 rounded-2xl shadow-2xl;
+  }
+
+  /* Canva-style Document Layout */
+  .prose-canva {
+    @apply text-slate-300 leading-relaxed max-w-none;
+  }
+  .prose-canva h1 {
+    @apply text-white text-4xl font-black mb-8 border-b-4 border-aged-cyan pb-4 inline-block tracking-tight;
+  }
+  .prose-canva h2 {
+    @apply text-white text-2xl font-bold mt-12 mb-6 border-b border-white/10 pb-2 tracking-tight;
+  }
+  .prose-canva h3 {
+    @apply text-aged-cyan text-lg font-bold mt-8 mb-4 tracking-wider uppercase;
+  }
+  .prose-canva p {
+    @apply mb-6 text-[15px] opacity-90;
+  }
+  .prose-canva ul, .prose-canva ol {
+    @apply mb-8 pl-1 list-none;
+  }
+  .prose-canva li {
+    @apply mb-4 relative pl-6 flex items-start gap-3;
+  }
+  .prose-canva li::before {
+    content: "→";
+    @apply text-aged-cyan absolute left-0 font-bold opacity-50;
+  }
+  .prose-canva strong {
+    @apply text-white font-bold;
+  }
+  .prose-canva blockquote {
+    @apply border-l-4 border-aged-cyan bg-white/5 p-6 my-8 rounded-r-2xl italic text-slate-400;
   }
 }
 
 /* Animations */
 @keyframes message-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
 }
 
 .animate-message-in {
-  animation: message-in 0.4s ease-out forwards;
+  animation: message-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #00f2ff; }
+.animate-shake {
+  animation: shake 0.2s ease-in-out 3;
+}
+
+.glow-on-hover:hover {
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.send-button-glow {
+  box-shadow: 0 4px 15px rgba(0, 242, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.send-button-glow:hover {
+  box-shadow: 0 0 30px rgba(0, 242, 255, 0.5);
+  transform: translateY(-2px) scale(1.05);
+}
+
+.send-button-glow:active {
+  transform: translateY(0) scale(0.95);
+}
+
+/* Document Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 242, 255, 0.3);
+}
+/* Silk Flowing Waves Background */
+.silk-waves {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.wave {
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  top: -50%;
+  left: -50%;
+  background: radial-gradient(circle at center, transparent 30%, rgba(157, 78, 221, 0.05) 40%, rgba(0, 242, 255, 0.1) 60%, transparent 70%);
+  filter: blur(60px);
+  animation: waveMotion 20s infinite linear;
+  opacity: 0.6;
+}
+
+.wave-1 {
+  background: conic-gradient(from 180deg at 50% 50%, #00f2ff44, #9d4edd44, #00f2ff44);
+  animation-duration: 25s;
+}
+
+.wave-2 {
+  background: conic-gradient(from 0deg at 50% 50%, #9d4edd33, #00f2ff33, #9d4edd33);
+  animation-duration: 35s;
+  animation-direction: reverse;
+}
+
+.wave-3 {
+  background: radial-gradient(ellipse at center, #00f2ff22, transparent 70%);
+  animation-duration: 45s;
+  filter: blur(100px);
+}
+
+@keyframes waveMotion {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.05); }
+}
+
+.aura-glow {
+  position: absolute;
+  width: 150%;
+  height: 150%;
+  background: radial-gradient(circle, rgba(0, 242, 255, 0.2) 0%, transparent 70%);
+  filter: blur(40px);
+  animation: glow-pulse 4s ease-in-out infinite;
+  z-index: 0;
+}
+
+/* Responsive refinements */
+@media (max-width: 768px) {
+  .landing-hero {
+    @apply mb-4 px-4;
+  }
+  .prose-canva {
+    @apply text-sm leading-relaxed;
+  }
+  .selection-card {
+    @apply p-6 rounded-3xl;
+  }
+}
+
+.max-w-base {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Floating Geometric Vectors */
+.vector-container {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.vector-polygon {
+  position: absolute;
+  background: linear-gradient(45deg, rgba(0, 242, 255, 0.05), transparent);
+  border: 1px solid rgba(0, 242, 255, 0.1);
+  pointer-events: none;
+  animation: float-around var(--duration) ease-in-out infinite;
+}
+
+@keyframes float-around {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(20px, -30px) rotate(90deg);
+  }
+  50% {
+    transform: translate(-15px, 20px) rotate(180deg);
+  }
+  75% {
+    transform: translate(30px, 15px) rotate(270deg);
+  }
+}
+
+.grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(to right, rgba(0, 242, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(circle at center, black, transparent 80%);
+}

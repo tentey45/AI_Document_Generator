@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Code, GraduationCap, Send, Trash2, Sidebar as SidebarIcon, BookOpen, User, Bot, Loader2, RefreshCw, FileCode, Copy, Download, FileText, Check, AlertCircle } from 'lucide-react';
+import { Sparkles, Code, GraduationCap, Send, Trash2, Sidebar as SidebarIcon, BookOpen, User, Bot, Loader2, RefreshCw, FileCode, Copy, Download, FileText, Check, AlertCircle, X, Plus, History, LogOut } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -9,6 +9,7 @@ import { saveAs } from 'file-saver';
 
 import './index.css';
 import heroAsset from './assets/hero_ai.png';
+import agedLogo from './assets/aged_logo.png';
 import LandingPage from './components/layout/LandingPage';
 
 function App() {
@@ -16,14 +17,22 @@ function App() {
   const [persona, setPersona] = useState(null);
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [nextActions, setNextActions] = useState([]);
   const [error, setError] = useState(null);
   const [docType, setDocType] = useState('auto');
-  const [copyStatus, setCopyStatus] = useState(null); 
+  const [copyStatus, setCopyStatus] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [wordCount, setWordCount] = useState(0);
+  const [tokenCount, setTokenCount] = useState(0);
   const messagesEndRef = useRef(null);
+
+  // Initialize API URL
+  const isLocal = window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1');
+  const API_BASE = (import.meta.env.VITE_API_BASE_URL || (!isLocal ? '/api' : 'http://127.0.0.1:8000')).replace(/\/$/, '');
 
   const docOptions = {
     developer: [
@@ -46,45 +55,92 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isStreaming]);
 
+  // Fetch session list when persona changes
+  useEffect(() => {
+    if (persona) {
+      fetchSessions();
+      // Reset stats and messages when switching persona
+      setWordCount(0);
+      setTokenCount(0);
+      if (!currentSessionId) {
+        setMessages([]);
+      }
+    }
+  }, [persona]);
+
+  const fetchSessions = async () => {
+    try {
+      const resp = await fetch(`${API_BASE}/sessions?persona=${persona}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setSessions(data);
+        // Calculate total tokens used in this persona across all sessions
+        const used = data.reduce((acc, s) => acc + (s.token_count || 0), 0);
+        setTokenCount(used);
+      }
+    } catch (e) { console.error("History fetch failed", e); }
+  };
+
+  const handleNewChat = () => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    setIsSidebarOpen(false);
+  };
+
+  const selectSession = async (id) => {
+    try {
+      const resp = await fetch(`${API_BASE}/sessions/${id}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setMessages(data.messages || []);
+        setCurrentSessionId(id);
+        setIsSidebarOpen(false);
+      }
+    } catch (e) { setError("Failed to load session history."); }
+  };
+
+  const deleteSession = async (e, id) => {
+    e.stopPropagation();
+    try {
+      if (await fetch(`${API_BASE}/sessions/${id}`, { method: 'DELETE' })) {
+        if (currentSessionId === id) handleNewChat();
+        fetchSessions();
+      }
+    } catch (e) { console.error(e); }
+  };
+
   const handleSendMessage = async (textOverride = null) => {
     const text = textOverride || inputText;
     if (!text.trim() || isStreaming) return;
 
     const userMessage = { role: 'user', content: text };
     setMessages(prev => [...prev, userMessage]);
+
+    // Simple word count and token estimation
+    setWordCount(text.trim().split(/\s+/).length);
+    setTokenCount(prev => prev + Math.ceil(text.length / 4));
+
     setInputText('');
     setIsThinking(true);
     setError(null);
     setNextActions([]);
 
-    try {
-      // 1. Get the Raw URL and Print it for Debugging
-      let rawUrl = import.meta.env.VITE_API_BASE_URL || '';
-      console.log('App: rawUrl found in environment:', rawUrl);
-      
-      // 2. FORCED: Ignore old Render.com links completely
-      if (rawUrl && rawUrl.includes('onrender.com')) {
-        console.warn('App: Detected legacy Render URL. Ignoring for Vercel native /api.');
-        rawUrl = '';
-      }
+    let activeSessionId = currentSessionId;
+    if (!activeSessionId) {
+      activeSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setCurrentSessionId(activeSessionId);
+    }
 
-      // 3. Determine if we are on Localhost or Production
-      const isLocal = window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1');
-      
-      // 4. Force /api for all non-local deployments
-      const finalUrl = rawUrl || (!isLocal ? '/api' : 'http://127.0.0.1:8000');
-      const API_URL = finalUrl.replace(/\/$/, '');
-      
-      console.log('App: Final API_URL target:', API_URL);
-      
-      const response = await fetch(`${API_URL}/chat-stream`, {
+    try {
+      const response = await fetch(`${API_BASE}/chat-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
           user_context: persona,
-          preferences: { 
-            theme: 'futuristic', 
+          session_id: activeSessionId,
+          preferences: {
+            theme: 'futuristic',
             high_fidelity: true,
             doc_type: docType
           }
@@ -109,11 +165,11 @@ function App() {
       while (!done) {
         const { value, done: readerDone } = await reader.read();
         done = readerDone;
-        
+
         if (value) {
           const chunk = decoder.decode(value, { stream: true });
           aiResponseText += chunk;
-          
+
           setMessages(prev => {
             const newMessages = [...prev];
             newMessages[newMessages.length - 1].content = aiResponseText;
@@ -123,6 +179,8 @@ function App() {
       }
 
       setIsStreaming(false);
+      // Refresh session list after a chat
+      fetchSessions();
 
       if (aiResponseText.includes("**Next Steps:**")) {
         const parts = aiResponseText.split("**Next Steps:**");
@@ -145,12 +203,12 @@ function App() {
   const handleCopy = (text, idx) => {
     const contentLines = text.split('**Next Steps:**')[0].trim().split('\n');
     const cleanLines = contentLines.map(line => {
-        let l = line.trim();
-        l = l.replace(/^[#]+\s+/, '');
-        l = l.replace(/^[\*\-\+]\s+/, '• ');
-        l = l.replace(/\*\*(.*?)\*\*/g, '$1');
-        l = l.replace(/`(.*?)`/g, '$1');
-        return l;
+      let l = line.trim();
+      l = l.replace(/^[#]+\s+/, '');
+      l = l.replace(/^[\*\-\+]\s+/, '• ');
+      l = l.replace(/\*\*(.*?)\*\*/g, '$1');
+      l = l.replace(/`(.*?)`/g, '$1');
+      return l;
     });
 
     navigator.clipboard.writeText(cleanLines.join('\n')).then(() => {
@@ -162,7 +220,7 @@ function App() {
   const handleDownloadPDF = (content) => {
     const printWindow = window.open('', '_blank');
     const cleanContent = content.split('**Next Steps:**')[0].trim();
-    
+
     // Formatting the content with modern typography and structured blocks
     const formattedContent = cleanContent
       .replace(/^# (.*$)/gim, '<div class="hero-section"><h1 class="main-title">$1</h1><div class="accent-bar"></div></div>')
@@ -304,21 +362,21 @@ function App() {
   const handleDownloadDoc = (content, index) => {
     const lines = content.split('**Next Steps:**')[0].trim().split('\n');
     const paragraphs = lines.map(line => {
-        const text = line.trim();
-        if (text.startsWith('# ')) return new Paragraph({ text: text.replace('# ', ''), heading: HeadingLevel.HEADING_1 });
-        if (text.startsWith('## ')) return new Paragraph({ text: text.replace('## ', ''), heading: HeadingLevel.HEADING_2 });
-        const runs = [];
-        const regex = /(\*\*.*?\*\*|`.*?`)/g;
-        let match, lastIdx = 0;
-        while ((match = regex.exec(text)) !== null) {
-            if (match.index > lastIdx) runs.push(new TextRun(text.slice(lastIdx, match.index)));
-            const chunk = match[0];
-            if (chunk.startsWith('**')) runs.push(new TextRun({ text: chunk.replace(/\*\*/g, ''), bold: true }));
-            else if (chunk.startsWith('`')) runs.push(new TextRun({ text: chunk.replace(/`/g, ''), color: "0056B3" }));
-            lastIdx = regex.lastIndex;
-        }
-        if (lastIdx < text.length) runs.push(new TextRun(text.slice(lastIdx)));
-        return new Paragraph({ children: runs.length > 0 ? runs : [new TextRun(text)] });
+      const text = line.trim();
+      if (text.startsWith('# ')) return new Paragraph({ text: text.replace('# ', ''), heading: HeadingLevel.HEADING_1 });
+      if (text.startsWith('## ')) return new Paragraph({ text: text.replace('## ', ''), heading: HeadingLevel.HEADING_2 });
+      const runs = [];
+      const regex = /(\*\*.*?\*\*|`.*?`)/g;
+      let match, lastIdx = 0;
+      while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIdx) runs.push(new TextRun(text.slice(lastIdx, match.index)));
+        const chunk = match[0];
+        if (chunk.startsWith('**')) runs.push(new TextRun({ text: chunk.replace(/\*\*/g, ''), bold: true }));
+        else if (chunk.startsWith('`')) runs.push(new TextRun({ text: chunk.replace(/`/g, ''), color: "0056B3" }));
+        lastIdx = regex.lastIndex;
+      }
+      if (lastIdx < text.length) runs.push(new TextRun(text.slice(lastIdx)));
+      return new Paragraph({ children: runs.length > 0 ? runs : [new TextRun(text)] });
     });
     const doc = new Document({ sections: [{ children: paragraphs }] });
     Packer.toBlob(doc).then(blob => saveAs(blob, `AGED_Export_${index}.docx`));
@@ -326,17 +384,13 @@ function App() {
 
   if (!persona) {
     return <LandingPage onSelect={(mode) => setPersona(mode)} />;
-  }  return (
+  } return (
     <div className="flex flex-col md:flex-row h-screen w-screen p-0 md:p-4 gap-0 md:gap-4 overflow-hidden">
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 glass rounded-none border-t-0 border-x-0 relative z-50">
         <div className="flex items-center gap-2">
-          <Sparkles className="text-aged-cyan" size={20} />
-          <h2 className="text-sm font-bold tracking-widest text-white">AGED AI</h2>
+           <img src={agedLogo} alt="AGED" className="w-6 h-6 rounded-md object-cover mix-blend-screen" />
         </div>
-        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 glass">
-          <SidebarIcon size={18} className="text-aged-cyan" />
-        </button>
       </div>
 
       {/* Sidebar - Animated Mobile Overlay */}
@@ -344,15 +398,17 @@ function App() {
         fixed md:relative z-50 inset-y-0 left-0 w-[280px] md:w-[280px] 
         glass shadow-2xl md:shadow-none p-6 flex flex-col shrink-0 
         transition-all duration-300 ease-in-out
-        ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full md:translate-x-0 opacity-0 md:opacity-100'}
+        ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full md:w-0 md:px-0 md:opacity-0 pointer-events-none'}
       `}>
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <Sparkles className="text-aged-cyan fill-aged-cyan" size={22} />
+             <div className="w-8 h-8 rounded-lg overflow-hidden border border-aged-cyan/50 shadow-[0_0_15px_rgba(0,242,255,0.3)]">
+                <img src={agedLogo} alt="AGED" className="w-full h-full object-cover" />
+             </div>
             <h2 className="text-lg font-bold">AGED CORE</h2>
           </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-400">
-             <Check size={20} className="text-aged-cyan" />
+          <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+            <X size={20} />
           </button>
         </div>
 
@@ -362,32 +418,46 @@ function App() {
             <h4 className="capitalize font-bold text-aged-cyan">{persona}</h4>
           </div>
 
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-2">
-              <FileCode size={12} /> Doc Format
+          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
+              <History size={12} /> Chat History
             </p>
-            <div className="relative">
-              <select 
-                value={docType} 
-                onChange={(e) => setDocType(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-aged-cyan appearance-none cursor-pointer"
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={handleNewChat}
+                className="w-full text-left p-3 rounded-xl border border-white/5 hover:border-aged-cyan/30 bg-white/5 hover:bg-white/10 transition-all text-xs font-semibold flex items-center gap-3 group"
               >
-                {docOptions[persona].map(opt => (
-                  <option key={opt.value} value={opt.value} className="bg-slate-900">{opt.label}</option>
-                ))}
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
-                <FileText size={14} />
-              </div>
+                <Plus size={14} className="text-aged-cyan" />
+                <span>New Chat</span>
+              </button>
+              
+              {sessions.map(s => (
+                <div key={s.id} className="group relative">
+                  <button 
+                    onClick={() => selectSession(s.id)}
+                    className={`w-full text-left p-3 rounded-xl border transition-all text-[11px] leading-relaxed flex flex-col gap-1 pr-10
+                      ${currentSessionId === s.id ? 'bg-aged-cyan/10 border-aged-cyan/30 text-white' : 'bg-transparent border-white/5 text-slate-400 hover:bg-white/5'}
+                    `}
+                  >
+                    <span className="font-bold truncate w-full">{s.title}</span>
+                    <span className="text-[9px] opacity-40 uppercase tracking-tighter">
+                      {new Date(s.updated_at * 1000).toLocaleDateString()}
+                    </span>
+                  </button>
+                  <button 
+                    onClick={(e) => deleteSession(e, s.id)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 opacity-0 group-hover:opacity-100 hover:text-red-400 text-slate-500 transition-all"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="mt-auto flex flex-col gap-3">
-            <button onClick={() => { setPersona(null); setIsSidebarOpen(false); }} className="glass py-2.5 flex items-center justify-center gap-2 text-xs font-semibold hover:border-aged-cyan transition-colors">
-              <RefreshCw size={14} /> Reset Persona
-            </button>
-            <button onClick={() => { setMessages([]); setIsSidebarOpen(false); }} className="glass py-2.5 flex items-center justify-center gap-2 text-xs font-semibold text-red-400 hover:border-red-500/50 transition-colors">
-              <Trash2 size={14} /> Clear Session
+          <div className="mt-6 flex flex-col gap-3">
+            <button onClick={() => { setPersona(null); setCurrentSessionId(null); setIsSidebarOpen(false); }} className="glass py-2.5 flex items-center justify-center gap-2 text-xs font-semibold hover:border-red-500/50 hover:text-red-400 transition-all">
+              <LogOut size={14} /> Exit Workspace
             </button>
           </div>
         </div>
@@ -395,140 +465,225 @@ function App() {
 
       {/* Click overlay for mobile sidebar */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <div className="glass flex-1 flex flex-col overflow-hidden m-0 md:rounded-2xl border-none md:border md:border-white/10 relative z-10">
-          <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-10 scroll-smooth custom-scrollbar">
-            {messages.length === 0 && !isThinking && (
-              <div className="h-full flex flex-col items-center justify-center opacity-40 text-center px-6">
-                <div className="relative mb-6">
-                  <div className="absolute inset-0 bg-aged-cyan/20 blur-2xl rounded-full"></div>
-                  <Bot size={64} className="text-aged-cyan relative" />
-                </div>
-                <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white">System Online</h2>
-                <p className="text-sm text-slate-400 mt-2 max-w-xs">Enter a query to architect premium documentation or receive strategic guidance.</p>
-              </div>
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-black/5">
+        
+        {/* Navigation / Control Bar */}
+        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-30 pointer-events-none">
+          <div className="flex items-center gap-2 pointer-events-auto">
+            {!isSidebarOpen && (
+              <button 
+                onClick={() => setIsSidebarOpen(true)} 
+                className="p-2 glass bg-white/5 border-white/10 hover:border-aged-cyan text-aged-cyan hover:text-white transition-all rounded-full"
+                title="Open Sidebar"
+              >
+                <SidebarIcon size={18} />
+              </button>
             )}
+          </div>
+          
+          <button 
+            onClick={() => setPersona(null)} 
+            className="pointer-events-auto p-2 glass bg-white/5 border-white/10 hover:border-aged-cyan text-white/50 hover:text-white transition-all rounded-full flex items-center gap-2 group"
+          >
+            <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" />
+            <span className="text-[10px] font-bold tracking-widest hidden md:inline">EXIT WORKSPACE</span>
+          </button>
+        </div>
 
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`max-w-[95%] md:max-w-[85%] animate-message-in ${msg.role === 'user' ? 'ml-auto' : ''}`}>
-                {msg.role === 'user' ? (
-                  <div className="bg-aged-cyan/10 border border-aged-cyan/20 px-5 md:px-6 py-3.5 md:py-4 rounded-2xl rounded-br-none shadow-[0_0_15px_rgba(0,242,255,0.05)]">
-                    <div className="flex items-start gap-3">
-                        <User size={16} className="mt-1 text-aged-cyan shrink-0" />
-                        <p className="text-sm md:text-base leading-relaxed text-white/90">{msg.content}</p>
-                    </div>
+        <div className="flex-1 flex flex-col overflow-hidden m-0 md:rounded-tl-2xl relative z-10 transition-all duration-500">
+          <div className="flex-1 overflow-y-auto px-4 md:px-0 space-y-10 scroll-smooth custom-scrollbar mt-14 md:mt-20">
+            {/* Centered Document Workspace */}
+            <div className="max-w-4xl mx-auto w-full pb-32">
+              
+              {messages.length === 0 && !isThinking && (
+                <div className="h-[60vh] flex flex-col items-center justify-center opacity-60 text-center px-6 transition-all duration-700">
+                  <div className="relative mb-10 transform scale-125">
+                    <div className="absolute inset-0 bg-aged-cyan/20 blur-[80px] rounded-full animate-pulse"></div>
+                    <img src={agedLogo} alt="AGED" className="w-24 h-24 md:w-32 md:h-32 object-cover relative z-10 filter drop-shadow-[0_0_30px_rgba(0,242,255,0.4)] mix-blend-screen" />
                   </div>
-                ) : (
-                  <div className="glass bg-white/[0.03] p-5 md:p-8 rounded-2xl md:rounded-3xl rounded-bl-none overflow-hidden relative group">
-                    <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center gap-2 text-aged-cyan">
-                            <Bot size={18} />
-                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">AGED v4.1 CORE</span>
-                        </div>
-                        <div className="flex gap-1.5 md:gap-2">
-                             <button onClick={() => handleCopy(msg.content, idx)} title="Copy Content" className="w-8 h-8 md:w-9 md:h-9 glass flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all">
-                                {copyStatus === idx ? <Check size={14} className="text-aged-cyan" /> : <Copy size={14} />}
-                            </button>
-                            <button onClick={() => handleDownloadDoc(msg.content, idx)} title="Export DOCX" className="w-8 h-8 md:w-9 md:h-9 glass flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all">
-                                <FileText size={14} />
-                            </button>
-                            <button onClick={() => handleDownloadPDF(msg.content)} title="Export PDF" className="w-8 h-8 md:w-9 md:h-9 glass flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all">
-                                <Download size={14} />
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div className="prose prose-sm md:prose-base prose-invert max-w-none prose-p:text-slate-300 prose-headings:text-white prose-headings:font-bold prose-headings:mb-4 prose-code:text-aged-cyan prose-code:bg-white/5 prose-code:px-1.5 prose-code:rounded">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-                          code({ node, inline, className, children, ...props }) {
-                            const match = /language-(\w+)/.exec(className || '');
-                            return !inline && match ? (
-                              <div className="my-4 rounded-xl overflow-hidden border border-white/10 bg-black/40">
-                                <SyntaxHighlighter 
-                                  style={vscDarkPlus} 
-                                  language={match[1]} 
-                                  PreTag="div" 
-                                  customStyle={{ padding: '1.25rem', background: 'transparent' }}
-                                  {...props}
-                                >
-                                    {String(children).replace(/\n$/, '')}
-                                </SyntaxHighlighter>
-                              </div>
-                            ) : ( <code className="bg-white/10 px-1.5 py-0.5 rounded text-aged-cyan text-[0.9em]" {...props}>{children}</code> );
-                          }
-                        }}
-                      >
-                        {msg.content}
-                      </ReactMarkdown>
-                    </div>
+                  <h2 className="text-3xl md:text-5xl font-black tracking-tight text-white mb-6">Document Architect</h2>
+                  <p className="text-base md:text-lg text-slate-300 mt-2 max-w-sm mx-auto leading-relaxed font-medium">
+                    Paste your code for documentation or describe what you want to create.
+                  </p>
+                  <div className="mt-8 px-4 py-2 rounded-full glass bg-aged-cyan/5 border-aged-cyan/20 text-[11px] text-aged-cyan font-bold tracking-[0.2em] uppercase">
+                    Initialize System Protocol: {persona?.toUpperCase()}
+                  </div>
+                </div>
+              )}
 
-                    {idx === messages.length - 1 && !isStreaming && nextActions.length > 0 && (
-                      <div className="mt-8 pt-6 border-t border-white/5">
-                        <h4 className="flex items-center gap-2 text-aged-cyan text-[10px] font-bold uppercase tracking-[0.2em] mb-4">
-                          <BookOpen size={14} /> Strategic Escalation
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                          {nextActions.map((action, i) => (
-                            <button key={i} className="glass py-2.5 px-4 text-xs text-left hover:border-aged-cyan/50 hover:bg-aged-cyan/5 transition-all text-white/80" onClick={() => handleSendMessage(action)}>
-                              {action}
-                            </button>
-                          ))}
+              {messages.map((msg, idx) => {
+                // Extract intent analysis if it exists
+                let displayContent = msg.content;
+                let intentAnalysis = null;
+                const intentMatch = displayContent.match(/<intent>(.*?)<\/intent>/s);
+                if (intentMatch) {
+                  intentAnalysis = intentMatch[1].trim();
+                  displayContent = displayContent.replace(intentMatch[0], '').trim();
+                }
+
+                return (
+                  <div key={idx} className={`mb-10 animate-message-in ${msg.role === 'user' ? 'max-w-2xl ml-auto' : 'w-full'}`}>
+                    {msg.role === 'user' ? (
+                      <div className="bg-aged-cyan/10 border border-aged-cyan/20 px-6 py-4 rounded-3xl rounded-br-none shadow-[0_0_20px_rgba(0,242,255,0.03)] backdrop-blur-sm">
+                        <div className="flex items-start gap-4">
+                          <User size={18} className="mt-1.5 text-aged-cyan shrink-0" />
+                          <p className="text-sm md:text-base leading-relaxed text-white/90 font-medium">{displayContent}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative group">
+                        {/* Thinking Layer - 1-2 lines intent */}
+                        {intentAnalysis && (
+                          <div className="mb-4 bg-white/[0.03] border border-white/5 rounded-2xl p-4 flex items-center gap-3 animate-message-in">
+                            <Bot size={14} className="text-aged-cyan/50" />
+                            <div className="flex-1">
+                              <p className="text-[10px] font-bold text-aged-cyan/40 uppercase tracking-[0.2em] mb-0.5">AGED Intent Analysis</p>
+                              <p className="text-[11px] italic text-slate-400 leading-relaxed font-medium">"{intentAnalysis}"</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Document Result - Canva Style */}
+                        <div className="glass bg-white/[0.02] border-white/5 p-6 md:p-12 rounded-[2rem] rounded-bl-none overflow-hidden relative shadow-2xl">
+                          <div className="flex justify-between items-center mb-10 pb-6 border-bottom border-white/5">
+                            <div className="flex items-center gap-3 text-aged-cyan">
+                              <Bot size={22} className="opacity-80" />
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-black uppercase tracking-[0.25em] opacity-50">AGED INTELLIGENCE</span>
+                                <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">{persona.toUpperCase()} MODE</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => handleCopy(displayContent, idx)} title="Copy" className="w-10 h-10 glass bg-white/5 border-white/10 flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all rounded-xl">
+                                {copyStatus === idx ? <Check size={16} className="text-aged-cyan" /> : <Copy size={16} />}
+                              </button>
+                              <button onClick={() => handleDownloadPDF(displayContent)} title="PDF" className="w-10 h-10 glass bg-white/5 border-white/10 flex items-center justify-center text-slate-400 hover:text-aged-cyan hover:border-aged-cyan transition-all rounded-xl">
+                                <Download size={16} />
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <div className="prose-canva">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                              code({ node, inline, className, children, ...props }) {
+                                const match = /language-(\w+)/.exec(className || '');
+                                return !inline && match ? (
+                                  <div className="my-8 rounded-2xl overflow-hidden border border-white/10 bg-black/60 shadow-inner">
+                                    <div className="bg-white/5 px-4 py-2 flex items-center justify-between border-b border-white/5">
+                                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{match[1]} SOURCE</span>
+                                      <div className="flex gap-1.5"><div className="w-2 h-2 rounded-full bg-red-400/30"></div><div className="w-2 h-2 rounded-full bg-yellow-400/30"></div><div className="w-2 h-2 rounded-full bg-green-400/30"></div></div>
+                                    </div>
+                                    <SyntaxHighlighter
+                                      style={vscDarkPlus}
+                                      language={match[1]}
+                                      PreTag="div"
+                                      customStyle={{ padding: '2rem', background: 'transparent', fontSize: '13px' }}
+                                      {...props}
+                                    >
+                                      {String(children).replace(/\n$/, '')}
+                                    </SyntaxHighlighter>
+                                  </div>
+                                ) : (<code className="bg-aged-cyan/10 px-2 py-0.5 rounded text-aged-cyan text-[0.85em] font-mono border border-aged-cyan/20" {...props}>{children}</code>);
+                              }
+                            }}
+                            >
+                              {displayContent}
+                            </ReactMarkdown>
+                          </div>
+
+                          {idx === messages.length - 1 && !isStreaming && nextActions.length > 0 && (
+                            <div className="mt-16 pt-10 border-t border-white/5">
+                              <h4 className="flex items-center gap-2 text-aged-cyan text-[10px] font-black uppercase tracking-[0.2em] mb-6">
+                                <BookOpen size={16} className="opacity-70" /> Strategic Escalation
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {nextActions.map((action, i) => (
+                                  <button key={i} className="glass py-4 px-5 text-[11px] font-bold text-left hover:border-aged-cyan/50 hover:bg-aged-cyan/5 transition-all text-white/50 hover:text-white rounded-2xl border-white/5" onClick={() => handleSendMessage(action)}>
+                                    {action}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            ))}
+                );
+              })}
 
-            {isThinking && (
-              <div className="flex gap-3 items-center text-aged-cyan px-4 py-6">
-                <Loader2 className="animate-spin" size={18} />
-                <span className="text-[10px] font-bold uppercase tracking-[0.15em]">Neural Processing...</span>
-              </div>
-            )}
-
-            {error && (
-              <div className="glass p-4 border-l-4 border-red-500 bg-red-500/5 max-w-lg mx-auto mb-6">
-                <div className="flex items-center gap-3 text-red-500">
-                  <AlertCircle size={20} />
-                  <p className="text-xs font-bold uppercase tracking-widest">Breach Detected: {error}</p>
+              {isThinking && (
+                <div className="flex gap-4 items-center text-aged-cyan px-2 py-8 animate-pulse">
+                  <div className="relative">
+                    <Loader2 className="animate-spin text-aged-cyan/50" size={24} />
+                    <Bot size={12} className="absolute inset-0 m-auto text-aged-cyan" />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Architectural Processing...</span>
                 </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
+              )}
+
+              {error && (
+                <div className="glass p-6 border-l-4 border-red-500 bg-red-500/5 max-w-2xl mx-auto my-12 animate-shake">
+                  <div className="flex items-center gap-4 text-red-500 mb-2">
+                    <AlertCircle size={24} />
+                    <p className="text-xs font-black uppercase tracking-widest">Protocol Breach: Communication Failed</p>
+                  </div>
+                  <p className="text-sm text-red-400/80 pl-10 underline decoration-dotted">{error}</p>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="p-4 md:p-8 mt-auto relative z-10">
-            <div className="glass bg-white/5 border border-white/10 focus-within:border-aged-cyan/50 focus-within:ring-4 focus-within:ring-aged-cyan/5 p-2 md:p-3 flex items-center gap-3 md:gap-4 transition-all duration-300">
-              <textarea
-                placeholder={`Query for ${docType === 'auto' ? 'General' : docType} as ${persona}...`}
-                className="flex-1 bg-transparent border-none text-white text-sm md:text-base resize-none outline-none py-2 px-3 md:px-4 max-h-40 min-h-[44px]"
-                value={inputText}
-                onChange={(e) => {
-                  setInputText(e.target.value);
-                  e.target.style.height = 'auto';
-                  e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
-                }}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-                rows={1}
-              />
-              <button 
-                className="bg-aged-cyan text-black w-11 md:w-12 h-11 md:h-12 rounded-xl flex items-center justify-center hover:shadow-[0_0_20px_rgba(0,242,255,0.4)] hover:scale-105 active:scale-95 disabled:opacity-30 disabled:grayscale transition-all shrink-0 shadow-lg"
-                onClick={() => handleSendMessage()}
-                disabled={isStreaming || isThinking || !inputText.trim()}
-              >
-                <Send size={20} />
-              </button>
+          <div className="sticky bottom-0 p-4 md:p-10 z-30 transition-all duration-500 mt-auto bg-gradient-to-t from-black via-black/80 to-transparent">
+            <div className="max-w-4xl mx-auto w-full relative">
+              <div className="glass bg-white/5 border-white/10 focus-within:border-aged-cyan/40 focus-within:bg-white/10 p-2 md:p-3 flex items-end gap-3 transition-all duration-500 rounded-3xl shadow-2xl relative">
+                <textarea
+                  placeholder={persona === 'developer' ? "Paste code or describe the document to generate..." : "Paste code and ask what you want to understand..."}
+                  className="flex-1 bg-transparent border-none text-white text-sm md:text-base resize-none outline-none py-3 px-4 md:px-5 max-h-60 min-h-[56px] font-medium leading-relaxed custom-scrollbar"
+                  value={inputText}
+                  onChange={(e) => {
+                    setInputText(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 240)}px`;
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                  rows={1}
+                />
+                <button
+                  className="bg-aged-cyan text-black w-12 md:w-14 h-12 md:h-14 rounded-2xl flex items-center justify-center send-button-glow disabled:opacity-30 disabled:grayscale transition-all shrink-0 mb-1"
+                  onClick={() => handleSendMessage()}
+                  disabled={isStreaming || isThinking || !inputText.trim()}
+                >
+                  <Send size={22} fill="currentColor" />
+                </button>
+              </div>
+              
+              {/* Feedback subtle counters */}
+              <div className="mt-5 px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex gap-6 text-[11px] font-bold uppercase tracking-widest text-white/60">
+                  <span className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-aged-cyan shadow-[0_0_10px_rgba(0,242,255,0.8)]"></div> 
+                    Words: {wordCount}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-aged-cyan shadow-[0_0_10px_rgba(0,242,255,0.8)]"></div> 
+                    Tokens left: {Math.max(0, 50000 - tokenCount).toLocaleString()} / 50,000
+                  </span>
+                </div>
+                {inputText.length === 0 && messages.length > 0 && (
+                  <p className="text-[10px] text-aged-cyan/50 italic font-medium">
+                    Tip: Paste code for documentation or describe what you want to create.
+                  </p>
+                )}
+              </div>
             </div>
-            <p className="text-[9px] text-center text-slate-500 mt-3 uppercase tracking-[0.3em] font-medium opacity-50">AGED Integrated Intelligence v4.1 • Secure Core x64</p>
           </div>
         </div>
       </main>

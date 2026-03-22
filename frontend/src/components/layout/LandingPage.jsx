@@ -1,76 +1,102 @@
 import { Code, GraduationCap, ArrowRight, Info } from 'lucide-react';
+import agedLogo from '../../assets/aged_logo.png';
 
 const LandingPage = ({ onSelect }) => {
   return (
-    <div className="landing-container flex flex-col items-center justify-center min-h-screen text-center p-6 py-12">
-      <div className="landing-hero mb-8 w-full max-w-3xl">
-        <h1 className="landing-title text-5xl md:text-6xl font-bold mb-4">AGED <span className="text-aged-cyan">AI</span></h1>
-        <p className="landing-subtitle text-xl text-gray-300 mb-2">Professional AI Document Architect & Assistant</p>
-        <p className="landing-description text-gray-400 mb-8 max-w-2xl mx-auto">
-          Generate high-fidelity technical documentation, learn and analyze complex code, or simply chat to brainstorm.
-        </p>
-
-        {/* Guidelines Section */}
-        <div className="guidelines bg-white/5 border border-white/10 rounded-2xl p-6 text-left shadow-lg mb-10 backdrop-blur-md">
-          <div className="flex items-center gap-3 text-aged-cyan mb-4">
-            <Info size={24} />
-            <h3 className="text-xl font-semibold text-white">How AGED Works</h3>
-          </div>
-          <p className="text-gray-300 mb-5 text-sm leading-relaxed">
-            AGED features two specialized personas tailored to your workflow. Select a mode to begin:
-          </p>
-          <ul className="space-y-5 text-sm text-gray-300 mb-6">
-            <li className="flex gap-4">
-              <Code className="text-cyan-400 shrink-0 mt-1" size={20} />
-              <div>
-                <strong className="text-white block text-base mb-1">Developer Mode</strong>
-                Engineered for software professionals. Use it to generate structured, precise technical documentation (such as READMEs, API guides, and architecture overviews) or discuss advanced engineering and system design concepts.
-              </div>
-            </li>
-            <li className="flex gap-4">
-              <GraduationCap className="text-purple-400 shrink-0 mt-1" size={20} />
-              <div>
-                <strong className="text-white block text-base mb-1">Learner Mode</strong>
-                Acts as your Senior Code Mentor. Choose this if you want to break down complex logic line-by-line, explore the 'Why' behind architectural choices, and receive easy-to-follow analogies and tutorials.
-              </div>
-            </li>
-          </ul>
-          <div className="text-xs text-gray-400 font-medium bg-black/30 p-4 rounded-xl border border-white/5">
-            <span className="text-white">💡 Pro Tip:</span> You don't always have to generate documents. You can chat with AGED normally for brainstorming and coding help. If you ever type something unreadable, AGED will politely ask for clarification.
-          </div>
-        </div>
+    <div className="landing-container relative flex flex-col items-center justify-center min-h-screen text-center p-6 py-12 overflow-hidden bg-black">
+      {/* Floating Vector Background */}
+      <div className="vector-container">
+        <div className="grid-overlay"></div>
+        {[...Array(12)].map((_, i) => (
+          <div
+            key={i}
+            className="vector-polygon"
+            style={{
+              width: `${Math.random() * 150 + 50}px`,
+              height: `${Math.random() * 150 + 50}px`,
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              clipPath: i % 3 === 0
+                ? 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)'
+                : i % 3 === 1
+                  ? 'polygon(25% 0%, 100% 0%, 75% 100%, 0% 100%)'
+                  : 'polygon(50% 0%, 0% 100%, 100% 100%)',
+              '--duration': `${Math.random() * 20 + 15}s`,
+              opacity: 0.1 + (Math.random() * 0.1)
+            }}
+          ></div>
+        ))}
       </div>
 
-      <div className="selection-grid grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
-        <div 
-          className="selection-card developer glass p-8 rounded-2xl cursor-pointer border border-white/10 hover:border-cyan-400 transition-all duration-300 group relative overflow-hidden" 
-          onClick={() => onSelect('developer')}
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <div className="card-icon mb-6 text-cyan-400 group-hover:scale-110 transition-transform origin-left">
-            <Code size={40} />
+      <div className="landing-hero mb-8 w-full max-w-4xl relative z-10 animate-fade-in flex flex-col items-center">
+        {/* Large Central Brand Identity */}
+        <div className="flex flex-col items-center mb-16">
+          <div className="w-36 h-36 md:w-72 md:h-72 mb-8 relative z-10 flex items-center justify-center transform transition-all duration-700 hover:scale-105">
+            {/* Soft Glow Aura */}
+            <div className="absolute inset-0 bg-aged-cyan/20 blur-[100px] rounded-full animate-pulse"></div>
+            <img
+              src={agedLogo}
+              alt="AGED Logo"
+              className="w-full h-full object-contain mix-blend-screen filter drop-shadow-[0_0_60px_rgba(0,242,255,0.6)] relative z-20"
+              style={{
+                maskImage: 'radial-gradient(circle at center, black 65%, transparent 95%)',
+                WebkitMaskImage: 'radial-gradient(circle at center, black 65%, transparent 95%)'
+              }}
+            />
           </div>
-          <h2 className="text-2xl font-bold mb-3 text-white text-left">Developer</h2>
-          <p className="text-gray-400 text-sm mb-8 text-left h-12">Document your code with technical precision, logic traces, and best practices.</p>
-          <div className="card-footer flex items-center justify-between text-cyan-400 font-semibold text-sm">
-            <span>GET STARTED</span>
-            <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
-          </div>
+          <p className="text-white text-3xl md:text-5xl font-black tracking-tight mb-4 drop-shadow-[0_0_20px_rgba(0,242,255,0.3)]">
+            Document Architect & Learning Partner
+          </p>
+          <div className="h-1 w-24 bg-aged-cyan rounded-full mb-8"></div>
         </div>
 
-        <div 
-          className="selection-card learner glass p-8 rounded-2xl cursor-pointer border border-white/10 hover:border-purple-400 transition-all duration-300 group relative overflow-hidden" 
-          onClick={() => onSelect('learner')}
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <div className="card-icon mb-6 text-purple-400 group-hover:scale-110 transition-transform origin-left">
-            <GraduationCap size={40} />
+        <p className="landing-description text-gray-400 mb-16 max-w-xl mx-auto text-sm md:text-base leading-relaxed font-medium">
+          The ultimate AI workspace for high-fidelity documentation and deep code discovery.
+          Bridge the gap between complex logic and professional reporting.
+        </p>
+
+        {/* System Protocol Selection Cards */}
+        <div className="selection-grid grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+          <div
+            className="selection-card developer glass p-10 rounded-[2.5rem] cursor-pointer border border-white/5 hover:border-cyan-400/50 transition-all duration-500 group relative overflow-hidden bg-white/[0.02] text-left"
+            onClick={() => onSelect('developer')}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="p-3 rounded-2xl bg-cyan-400/10 text-cyan-400 group-hover:scale-110 transition-transform">
+                <Code size={32} />
+              </div>
+              <h2 className="text-3xl font-black text-white tracking-tight uppercase">Developer</h2>
+            </div>
+            <p className="text-gray-400 text-sm mb-10 leading-relaxed font-medium">
+              For professionals. Generate high-fidelity READMEs, Technical Specs,
+              and API documentation with structural precision and engineering best practices.
+            </p>
+            <div className="card-footer flex items-center justify-between text-cyan-400 font-black text-[10px] tracking-[0.3em] bg-white/5 p-4 rounded-2xl border border-white/5 group-hover:bg-cyan-400 group-hover:text-black transition-all">
+              <span>INITIALIZE DEVELOPER CORE</span>
+              <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
+            </div>
           </div>
-          <h2 className="text-2xl font-bold mb-3 text-white text-left">Learner</h2>
-          <p className="text-gray-400 text-sm mb-8 text-left h-12">Deeply understand code and learn concepts with easy-to-follow analogies.</p>
-          <div className="card-footer flex items-center justify-between text-purple-400 font-semibold text-sm">
-            <span>GET STARTED</span>
-            <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
+
+          <div
+            className="selection-card learner glass p-10 rounded-[2.5rem] cursor-pointer border border-white/5 hover:border-purple-400/50 transition-all duration-500 group relative overflow-hidden bg-white/[0.02] text-left"
+            onClick={() => onSelect('learner')}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="p-3 rounded-2xl bg-purple-400/10 text-purple-400 group-hover:scale-110 transition-transform">
+                <GraduationCap size={32} />
+              </div>
+              <h2 className="text-3xl font-black text-white tracking-tight uppercase">Learner</h2>
+            </div>
+            <p className="text-gray-400 text-sm mb-10 leading-relaxed font-medium">
+              For learners. Break down complex logic line-by-line, explore architectural
+              decisions through analogies, and simplify high-level concepts into actionable knowledge.
+            </p>
+            <div className="card-footer flex items-center justify-between text-purple-400 font-black text-[10px] tracking-[0.3em] bg-white/5 p-4 rounded-2xl border border-white/5 group-hover:bg-purple-400 group-hover:text-black transition-all">
+              <span>INITIALIZE LEARNING ENGINE</span>
+              <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
+            </div>
           </div>
         </div>
       </div>
