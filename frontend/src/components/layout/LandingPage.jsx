@@ -2,7 +2,7 @@ import { Code, GraduationCap, ArrowRight, Info } from 'lucide-react';
 
 const LandingPage = ({ onSelect }) => {
   return (
-    <div className="landing-container flex flex-col items-center justify-center min-h-screen text-center p-6">
+    <div className="landing-container flex flex-col items-center justify-center min-h-screen text-center p-6 py-12">
       <div className="landing-hero mb-8 w-full max-w-3xl">
         <h1 className="landing-title text-5xl md:text-6xl font-bold mb-4">AGED <span className="text-aged-cyan">AI</span></h1>
         <p className="landing-subtitle text-xl text-gray-300 mb-2">Professional AI Document Architect & Assistant</p>

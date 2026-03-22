@@ -11,7 +11,10 @@ from pydantic import BaseModel, Field
 # 1. INTEGRATED CONFIGURATION
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    # Try multiple common locations for .env
+    load_dotenv() # Default (.)
+    load_dotenv("backend/.env") # Relative to backend
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env")) # Correct for lambda paths
 except ImportError:
     print("Warning: python-dotenv not installed. Skipping local environment loading.")
 

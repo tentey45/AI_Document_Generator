@@ -161,21 +161,144 @@ function App() {
 
   const handleDownloadPDF = (content) => {
     const printWindow = window.open('', '_blank');
-    const formattedContent = content.split('**Next Steps:**')[0]
-      .replace(/^# (.*$)/gim, '<h1 style="color:#000;margin-bottom:20px;">$1</h1>')
-      .replace(/^## (.*$)/gim, '<h2 style="color:#000;border-bottom:1px solid #ccc;padding-bottom:5px;margin-top:30px;">$1</h2>')
-      .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
-      .replace(/`(.*?)`/g, '<span style="color:#0056b3;font-family:monospace;font-weight:500;">$1</span>')
-      .replace(/\n\n/gim, '<br><br>')
+    const cleanContent = content.split('**Next Steps:**')[0].trim();
+    
+    // Formatting the content with modern typography and structured blocks
+    const formattedContent = cleanContent
+      .replace(/^# (.*$)/gim, '<div class="hero-section"><h1 class="main-title">$1</h1><div class="accent-bar"></div></div>')
+      .replace(/^## (.*$)/gim, '<h2 class="section-title">$1</h2>')
+      .replace(/^### (.*$)/gim, '<h3 class="subsection-title">$1</h3>')
+      .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+      .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
+      // Custom List Items
+      .replace(/^ - (.*$)/gim, '<li class="list-item">$1</li>')
+      .replace(/^ \* (.*$)/gim, '<li class="list-item">$1</li>')
+      .replace(/\n\n/gim, '</p><p class="content-text">')
       .replace(/\n/gim, '<br>');
 
     printWindow.document.write(`
-      <html><head><style>body{font-family:sans-serif;padding:60px;color:#000;line-height:1.8;max-width:850px;margin:0 auto;}</style></head><body>
-      <div style="font-size:11px;color:#777;margin-bottom:40px;">PERSONA: ${persona.toUpperCase()} | ${new Date().toLocaleDateString()}</div>
-      ${formattedContent}</body></html>
+      <html>
+        <head>
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+          <style>
+            :root {
+              --primary: #0084FF;
+              --dark: #121217;
+              --gray-light: #F8F9FA;
+              --gray-medium: #E9ECEF;
+              --gray-text: #495057;
+            }
+            * { box-sizing: border-box; }
+            body { 
+              font-family: 'Inter', sans-serif; 
+              padding: 60px 80px; 
+              color: var(--dark); 
+              line-height: 1.6; 
+              max-width: 900px; 
+              margin: 0 auto; 
+              background: #fff;
+            }
+            .meta-header {
+              font-size: 10px;
+              color: #ADB5BD;
+              text-transform: uppercase;
+              letter-spacing: 0.15em;
+              margin-bottom: 50px;
+              display: flex;
+              justify-content: space-between;
+              border-bottom: 1px solid var(--gray-medium);
+              padding-bottom: 10px;
+            }
+            .hero-section {
+              margin-bottom: 40px;
+              position: relative;
+            }
+            .main-title {
+              font-family: 'Outfit', sans-serif;
+              font-size: 38px;
+              font-weight: 700;
+              margin: 0 0 15px 0;
+              color: var(--dark);
+              line-height: 1.1;
+            }
+            .accent-bar {
+              height: 4px;
+              width: 60px;
+              background: var(--primary);
+              border-radius: 2px;
+            }
+            .section-title {
+              font-family: 'Outfit', sans-serif;
+              font-size: 22px;
+              font-weight: 700;
+              margin-top: 45px;
+              margin-bottom: 20px;
+              color: var(--dark);
+              border-bottom: 2px solid var(--gray-light);
+              padding-bottom: 8px;
+            }
+            .subsection-title {
+              font-size: 16px;
+              font-weight: 600;
+              margin-top: 30px;
+              margin-bottom: 10px;
+              color: var(--primary);
+            }
+            .content-text {
+              margin: 0 0 1.5em 0;
+              color: var(--gray-text);
+              font-size: 14.5px;
+            }
+            .inline-code {
+              font-family: monospace;
+              background: var(--gray-light);
+              color: #D63384;
+              padding: 2px 5px;
+              border-radius: 4px;
+              font-size: 0.9em;
+            }
+            .list-item {
+              margin-bottom: 8px;
+              list-style: none;
+              position: relative;
+              padding-left: 20px;
+              font-size: 14.5px;
+              color: var(--gray-text);
+            }
+            .list-item::before {
+              content: "•";
+              color: var(--primary);
+              font-weight: bold;
+              position: absolute;
+              left: 0;
+            }
+            @media print {
+              body { padding: 40px; font-size: 12pt; }
+              .meta-header { position: absolute; top: 20px; width: calc(100% - 80px); }
+              .hero-section { page-break-after: avoid; }
+              h2, h3 { page-break-after: avoid; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="meta-header">
+            <span>PERSONA: ${persona.toUpperCase()}</span>
+            <span>DATE: ${new Date().toLocaleDateString()}</span>
+            <span>AGED AI DOC ARCHITECT</span>
+          </div>
+          <div class="content-wrapper">
+            <p class="content-text">${formattedContent}</p>
+          </div>
+          <footer style="margin-top: 100px; text-align: center; font-size: 10px; color: #ADB5BD; border-top: 1px solid var(--gray-medium); padding-top: 20px;">
+            AGED (Artificial Intelligence Document & Design Engine) - Professional Series
+          </footer>
+        </body>
+      </html>
     `);
     printWindow.document.close();
-    setTimeout(() => printWindow.print(), 500);
+    setTimeout(() => printWindow.print(), 800);
   };
 
   const handleDownloadDoc = (content, index) => {
