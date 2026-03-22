@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import traceback
+import time
 from groq import AsyncGroq
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -63,6 +64,22 @@ TEMPLATES = {
     "website_generation": "Architect premium UI/UX components.",
     "rewrite_improve": "Perform editorial refinement for linguistic impact."
 }
+
+def log_interaction(prompt, response, user_context="general"):
+    """Log an interaction to console (for hosting logs) and local file."""
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = f"[{timestamp}] [Context: {user_context}]\nUSER: {prompt}\nAGED: {response}\n{'-'*50}\n"
+    
+    # 1. Print to console: This is CRITICAL for Vercel Hosting logs visibility
+    print(f"\n--- HOSTING INTERACTION LOG ---\n{log_entry}")
+    
+    # 2. Try to write to local file (works in local dev or environments with persistent storage)
+    try:
+        with open("user_prompts.log", "a", encoding="utf-8") as f:
+            f.write(log_entry)
+    except:
+        # Silently fail for read-only serverless filesystems
+        pass
 
 def get_groq_client():
     if not GROQ_API_KEY:
@@ -143,12 +160,17 @@ async def chat_stream_endpoint(payload: ChatRequest):
         raise HTTPException(status_code=400, detail="Message empty.")
 
     async def event_stream():
+        full_response = []
         async for chunk in generate_assistant_streaming(
             message=message,
             user_context=payload.user_context,
             doc_type=payload.preferences.get("doc_type", "auto")
         ):
+            full_response.append(chunk)
             yield chunk
+        
+        # Log after the stream completes
+        log_interaction(message, "".join(full_response), payload.user_context)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 

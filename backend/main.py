@@ -62,6 +62,22 @@ def save_session(session_id: str, history: list, persona: str):
     except Exception as e:
         print(f"Failed to save session {session_id}: {e}")
 
+def log_interaction(prompt: str, response: str, session_id: str):
+    """Log an interaction to a central file and console."""
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = f"[{timestamp}] [Session: {session_id}]\nUSER: {prompt}\nAGED: {response}\n{'-'*50}\n"
+    
+    # Store locally in user_prompts.log
+    try:
+        with open("user_prompts.log", "a", encoding="utf-8") as f:
+            f.write(log_entry)
+            f.flush()
+    except Exception as e:
+        print(f"Failed to write to central log: {e}")
+    
+    # Also print to console for hosting logs (Vercel/Dashboard visibility)
+    print(f"\n--- INTERACTION LOG ---\n{log_entry}")
+
 @app.get("/sessions")
 def list_sessions(persona: str = None):
     sessions = []
@@ -132,6 +148,9 @@ def chat_endpoint(payload: ChatRequest):
         current_history.append({"role": "user", "content": message})
         current_history.append({"role": "assistant", "content": result.get("content", "")})
         save_session(payload.session_id, current_history, payload.user_context)
+        
+        # Log the interaction globally
+        log_interaction(message, result.get("content", ""), payload.session_id)
              
         return result
     except HTTPException:
@@ -172,6 +191,9 @@ def chat_stream_endpoint(payload: ChatRequest):
             current_history.append({"role": "user", "content": message})
             current_history.append({"role": "assistant", "content": "".join(full_response)})
             save_session(payload.session_id, current_history, payload.user_context)
+            
+            # Log the interaction globally
+            log_interaction(message, "".join(full_response), payload.session_id)
             
         except Exception as e:
             yield f"\n[Backend Error: {str(e)}]"
