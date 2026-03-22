@@ -22,6 +22,18 @@ except ImportError:
 # Vercel environment variables are preferred
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+# 1.5 PERSISTENT STORAGE (SUPABASE) - Optional
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase_client = None
+
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        from supabase import create_client
+        supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except:
+        print("Warning: Supabase client library not found or initialization failed.")
+
 # 2. INTEGRATED SCHEMAS
 class ChatRequest(BaseModel):
     message: str = Field(..., description="User's natural language message")
@@ -78,8 +90,18 @@ def log_interaction(prompt, response, user_context="general"):
         with open("user_prompts.log", "a", encoding="utf-8") as f:
             f.write(log_entry)
     except:
-        # Silently fail for read-only serverless filesystems
         pass
+
+    # 3. PERSISTENT STORAGE (SUPABASE) - For Website Hosting Logs
+    if supabase_client:
+        try:
+            supabase_client.table("interactions").insert({
+                "context": user_context,
+                "prompt": prompt,
+                "response": response
+            }).execute()
+        except Exception as e:
+            print(f"Supabase Log Error: {e}")
 
 def get_groq_client():
     if not GROQ_API_KEY:

@@ -19,6 +19,18 @@ except ImportError:
 
 app = FastAPI(title="AI Document Generator (Groq)")
 
+# 1.5 PERSISTENT STORAGE (SUPABASE) - Optional for Hosted Persistence
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase_client = None
+
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        from supabase import create_client
+        supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except:
+        print("Warning: Supabase client library not found or initialization failed.")
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -77,6 +89,17 @@ def log_interaction(prompt: str, response: str, session_id: str):
     
     # Also print to console for hosting logs (Vercel/Dashboard visibility)
     print(f"\n--- INTERACTION LOG ---\n{log_entry}")
+    
+    # 3. Persistent Storage (Supabase) if available
+    if supabase_client:
+        try:
+            supabase_client.table("interactions").insert({
+                "session_id": session_id,
+                "prompt": prompt,
+                "response": response
+            }).execute()
+        except Exception as e:
+            print(f"Supabase Log Error: {e}")
 
 @app.get("/sessions")
 def list_sessions(persona: str = None):
