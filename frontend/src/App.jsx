@@ -57,15 +57,58 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isStreaming]);
 
+  // --- PERSISTENCE HOOKS ---
+  // Load state from localStorage on initial mount
+  useEffect(() => {
+    const savedPersona = localStorage.getItem('aged_persona');
+    const savedSessionId = localStorage.getItem('aged_current_session_id');
+    const savedInputText = localStorage.getItem('aged_input_text');
+    const savedMessages = localStorage.getItem('aged_messages');
+
+    if (savedPersona) setPersona(savedPersona);
+    if (savedSessionId) setCurrentSessionId(savedSessionId);
+    if (savedInputText) setInputText(savedInputText);
+    if (savedMessages) {
+      try { setMessages(JSON.parse(savedMessages)); }
+      catch (e) { console.error("Failed to parse saved messages", e); }
+    }
+  }, []);
+
+  // Sync persona and sessionId to localStorage
+  useEffect(() => {
+    if (persona) localStorage.setItem('aged_persona', persona);
+    else localStorage.removeItem('aged_persona');
+  }, [persona]);
+
+  useEffect(() => {
+    if (currentSessionId) localStorage.setItem('aged_current_session_id', currentSessionId);
+    else localStorage.removeItem('aged_current_session_id');
+  }, [currentSessionId]);
+
+  // Sync inputText to localStorage
+  useEffect(() => {
+    localStorage.setItem('aged_input_text', inputText);
+  }, [inputText]);
+
+  // Sync messages to localStorage
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem('aged_messages', JSON.stringify(messages));
+    } else {
+      localStorage.removeItem('aged_messages');
+    }
+  }, [messages]);
+
   // Fetch session list when persona changes
   useEffect(() => {
     if (persona) {
       fetchSessions();
-      // Reset stats and messages when switching persona
-      setWordCount(0);
-      setTokenCount(0);
-      if (!currentSessionId) {
+      // Only reset if no messages found in local storage
+      const savedMessages = localStorage.getItem('aged_messages');
+      if (!currentSessionId && !savedMessages) {
         setMessages([]);
+        setWordCount(0);
+        setTokenCount(0);
       }
     }
   }, [persona]);
@@ -86,6 +129,8 @@ function App() {
   const handleNewChat = () => {
     setCurrentSessionId(null);
     setMessages([]);
+    localStorage.removeItem('aged_messages');
+    localStorage.removeItem('aged_current_session_id');
     setIsSidebarOpen(false);
   };
 
@@ -104,7 +149,8 @@ function App() {
   const deleteSession = async (e, id) => {
     e.stopPropagation();
     try {
-      if (await fetch(`${API_BASE}/sessions/${id}`, { method: 'DELETE' })) {
+      const resp = await fetch(`${API_BASE}/sessions/${id}`, { method: 'DELETE' });
+      if (resp.ok) {
         if (currentSessionId === id) handleNewChat();
         fetchSessions();
       }

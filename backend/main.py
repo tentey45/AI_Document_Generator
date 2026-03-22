@@ -79,18 +79,41 @@ def log_interaction(prompt: str, response: str, session_id: str):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     log_entry = f"[{timestamp}] [Session: {session_id}]\nUSER: {prompt}\nAGED: {response}\n{'-'*50}\n"
     
-    # Store locally in user_prompts.log
+    # 1. Store locally in user_prompts.log (Human readable)
     try:
         with open("user_prompts.log", "a", encoding="utf-8") as f:
             f.write(log_entry)
             f.flush()
     except Exception as e:
-        print(f"Failed to write to central log: {e}")
+        print(f"Failed to write to text log: {e}")
     
-    # Also print to console for hosting logs (Vercel/Dashboard visibility)
+    # 2. Store locally in conversation_history.json (Structured JSON for "local file" requirement)
+    HISTORY_FILE = "conversation_history.json"
+    try:
+        history_data = []
+        if os.path.exists(HISTORY_FILE) and os.path.getsize(HISTORY_FILE) > 0:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                try:
+                    history_data = json.load(f)
+                except json.JSONDecodeError:
+                    history_data = []
+        
+        history_data.append({
+            "timestamp": timestamp,
+            "session_id": session_id,
+            "user_prompt": prompt,
+            "aged_response": response
+        })
+        
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history_data, f, indent=2)
+    except Exception as e:
+        print(f"Failed to write to JSON history: {e}")
+        
+    # 3. Print to console for visibility
     print(f"\n--- INTERACTION LOG ---\n{log_entry}")
     
-    # 3. Persistent Storage (Supabase) if available
+    # 4. Persistent Storage (Supabase) if available
     if supabase_client:
         try:
             supabase_client.table("interactions").insert({
