@@ -28,6 +28,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [wordCount, setWordCount] = useState(0);
   const [tokenCount, setTokenCount] = useState(0);
+  const [promptHistory, setPromptHistory] = useState([]);
   const messagesEndRef = useRef(null);
 
   // Initialize API URL - Optimized for cross-device local testing and production deployment
@@ -73,10 +74,16 @@ function App() {
     } else {
       localStorage.removeItem(`aged_messages_${persona}`);
     }
+
+    if (promptHistory.length > 0) {
+      localStorage.setItem(`aged_prompt_history_${persona}`, JSON.stringify(promptHistory));
+    } else {
+      localStorage.removeItem(`aged_prompt_history_${persona}`);
+    }
     
     localStorage.setItem(`aged_input_text_${persona}`, inputText);
     localStorage.setItem('aged_active_persona', persona);
-  }, [persona, currentSessionId, messages, inputText]);
+  }, [persona, currentSessionId, messages, inputText, promptHistory]);
 
   // Load state when persona is initialized/changed
   useEffect(() => {
@@ -85,6 +92,7 @@ function App() {
     const savedSessionId = localStorage.getItem(`aged_session_id_${persona}`);
     const savedMessages = localStorage.getItem(`aged_messages_${persona}`);
     const savedInputText = localStorage.getItem(`aged_input_text_${persona}`);
+    const savedPrompts = localStorage.getItem(`aged_prompt_history_${persona}`);
 
     if (savedSessionId) setCurrentSessionId(savedSessionId);
     else setCurrentSessionId(null);
@@ -94,6 +102,13 @@ function App() {
       catch (e) { setMessages([]); }
     } else {
       setMessages([]);
+    }
+
+    if (savedPrompts) {
+      try { setPromptHistory(JSON.parse(savedPrompts)); }
+      catch (e) { setPromptHistory([]); }
+    } else {
+      setPromptHistory([]);
     }
 
     if (savedInputText) setInputText(savedInputText);
@@ -155,10 +170,14 @@ function App() {
 
   const handleSendMessage = async (textOverride = null) => {
     const text = textOverride || inputText;
-    if (!text.trim() || isStreaming) return;
-
     const userMessage = { role: 'user', content: text };
     setMessages(prev => [...prev, userMessage]);
+    
+    // Add to local prompt history (Proves LocalStorage persistence)
+    setPromptHistory(prev => {
+      const filtered = prev.filter(p => p !== text);
+      return [text, ...filtered].slice(0, 20);
+    });
 
     // Simple word count and token estimation
     setWordCount(text.trim().split(/\s+/).length);
@@ -495,6 +514,27 @@ function App() {
                     <Trash2 size={12} />
                   </button>
                 </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar mt-4">
+            <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
+              <FileText size={12} /> Local Prompt Cache
+            </p>
+            <div className="flex flex-col gap-2">
+              {promptHistory.length === 0 && (
+                <p className="text-[9px] text-slate-600 italic px-2">No locally cached prompts yet.</p>
+              )}
+              {promptHistory.map((p, i) => (
+                <button 
+                  key={i}
+                  onClick={() => setInputText(p)}
+                  className="w-full text-left p-2 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/5 transition-all text-[9px] text-slate-500 hover:text-white truncate"
+                  title={p}
+                >
+                  {p}
+                </button>
               ))}
             </div>
           </div>
