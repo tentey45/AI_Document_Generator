@@ -87,7 +87,17 @@ function App() {
 
   // Load state when persona is initialized/changed
   useEffect(() => {
-    if (!persona) return;
+    if (!persona) {
+      // Clear all state when exiting to landing page
+      setMessages([]);
+      setCurrentSessionId(null);
+      setInputText('');
+      setPromptHistory([]);
+      return;
+    }
+
+    // Immediately clear current messages before loading persona-specific ones
+    setMessages([]);
 
     const savedSessionId = localStorage.getItem(`aged_session_id_${persona}`);
     const savedMessages = localStorage.getItem(`aged_messages_${persona}`);
@@ -100,19 +110,14 @@ function App() {
     if (savedMessages) {
       try { setMessages(JSON.parse(savedMessages)); }
       catch (e) { setMessages([]); }
-    } else {
-      setMessages([]);
     }
 
     if (savedPrompts) {
       try { setPromptHistory(JSON.parse(savedPrompts)); }
       catch (e) { setPromptHistory([]); }
-    } else {
-      setPromptHistory([]);
     }
 
     if (savedInputText) setInputText(savedInputText);
-    else setInputText('');
 
     fetchSessions();
   }, [persona]);
@@ -138,10 +143,21 @@ function App() {
   };
 
   const handleNewChat = () => {
-    setCurrentSessionId(null);
     setMessages([]);
-    localStorage.removeItem(`aged_messages_${persona}`);
-    localStorage.removeItem(`aged_session_id_${persona}`);
+    setCurrentSessionId(null);
+    setInputText('');
+    if (persona) {
+      localStorage.removeItem(`aged_messages_${persona}`);
+      localStorage.removeItem(`aged_session_id_${persona}`);
+    }
+    setIsSidebarOpen(false);
+  };
+
+  const handleExit = () => {
+    setPersona(null);
+    setMessages([]);
+    setCurrentSessionId(null);
+    setInputText('');
     setIsSidebarOpen(false);
   };
 
@@ -447,8 +463,10 @@ function App() {
 
   if (!persona) {
     return <LandingPage onSelect={(mode) => setPersona(mode)} />;
-  } return (
-    <div className="flex flex-col md:flex-row h-screen w-screen p-0 md:p-4 gap-0 md:gap-4 overflow-hidden">
+  } 
+  
+  return (
+    <div className={`flex flex-col md:flex-row h-screen w-screen p-0 md:p-4 gap-0 md:gap-4 overflow-hidden theme-${persona} transition-colors duration-1000 bg-black`}>
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 glass rounded-none border-t-0 border-x-0 relative z-50">
         <div className="flex items-center gap-2">
@@ -476,42 +494,51 @@ function App() {
         </div>
 
         <div className="flex flex-col gap-6 flex-1">
-          <div className="glass p-4 border-l-4 border-aged-cyan">
-            <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">Active Persona</p>
-            <h4 className="capitalize font-bold text-aged-cyan">{persona}</h4>
+          <div className="glass-premium p-4 border-l-4 border-[var(--theme-primary)] bg-white/5">
+            <p className="text-[10px] lowercase tracking-[0.2em] text-white/40 mb-1">Active Persona</p>
+            <h4 className="capitalize font-black text-white flex items-center gap-2">
+               {persona === 'developer' ? <Code size={16} className="text-[var(--theme-primary)]" /> : <GraduationCap size={16} className="text-[var(--theme-primary)]" />}
+               {persona}
+            </h4>
           </div>
 
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
             <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
               <History size={12} /> Chat History
             </p>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
               <button 
                 onClick={handleNewChat}
-                className="w-full text-left p-3 rounded-xl border border-white/5 hover:border-aged-cyan/30 bg-white/5 hover:bg-white/10 transition-all text-xs font-semibold flex items-center gap-3 group"
+                className="w-full text-left p-4 rounded-2xl border border-white/5 hover:border-[var(--theme-primary)]/40 bg-white/5 hover:bg-white/[0.08] transition-all text-[11px] font-black tracking-widest uppercase flex items-center gap-3 group"
               >
-                <Plus size={14} className="text-aged-cyan" />
-                <span>New Chat</span>
+                <div className="w-8 h-8 rounded-xl bg-[var(--theme-primary)]/10 flex items-center justify-center text-[var(--theme-primary)] group-hover:scale-110 transition-transform">
+                  <Plus size={16} />
+                </div>
+                <span>New Protocol</span>
               </button>
               
               {sessions.map(s => (
                 <div key={s.id} className="group relative">
                   <button 
                     onClick={() => selectSession(s.id)}
-                    className={`w-full text-left p-3 rounded-xl border transition-all text-[11px] leading-relaxed flex flex-col gap-1 pr-10
-                      ${currentSessionId === s.id ? 'bg-aged-cyan/10 border-aged-cyan/30 text-white' : 'bg-transparent border-white/5 text-slate-400 hover:bg-white/5'}
+                    className={`w-full text-left p-4 rounded-2xl border transition-all text-[11px] leading-relaxed flex flex-col gap-2 pr-12
+                      ${currentSessionId === s.id 
+                        ? 'bg-[var(--theme-primary)]/10 border-[var(--theme-primary)]/30 text-white shadow-[0_0_20px_var(--theme-glow)]' 
+                        : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/[0.08] hover:border-white/10'}
                     `}
                   >
-                    <span className="font-bold truncate w-full">{s.title}</span>
-                    <span className="text-[9px] opacity-40 uppercase tracking-tighter">
-                      {new Date(s.updated_at * 1000).toLocaleDateString()}
-                    </span>
+                    <span className="font-bold truncate w-full group-hover:text-white transition-colors">{s.title}</span>
+                    <div className="flex items-center justify-between opacity-40">
+                      <span className="text-[9px] uppercase tracking-widest">
+                        {new Date(s.updated_at * 1000).toLocaleDateString()}
+                      </span>
+                    </div>
                   </button>
                   <button 
                     onClick={(e) => deleteSession(e, s.id)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 opacity-0 group-hover:opacity-100 hover:text-red-400 text-slate-500 transition-all"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 opacity-0 group-hover:opacity-60 hover:opacity-100 hover:text-red-400 text-white/40 transition-all rounded-xl hover:bg-red-400/10"
                   >
-                    <Trash2 size={12} />
+                    <Trash2 size={14} />
                   </button>
                 </div>
               ))}
@@ -540,8 +567,8 @@ function App() {
           </div>
 
           <div className="mt-6 flex flex-col gap-3">
-            <button onClick={() => { setPersona(null); setCurrentSessionId(null); setIsSidebarOpen(false); }} className="glass py-2.5 flex items-center justify-center gap-2 text-xs font-semibold hover:border-red-500/50 hover:text-red-400 transition-all">
-              <LogOut size={14} /> Exit Workspace
+            <button onClick={handleExit} className="glass py-3.5 flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest hover:border-red-500/50 hover:text-red-400 transition-all rounded-2xl bg-white/5">
+              <LogOut size={16} /> Exit Workspace
             </button>
           </div>
         </div>
@@ -556,30 +583,43 @@ function App() {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-black/5">
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative glass bg-black/40 md:rounded-3xl border-white/5 mx-0 md:mx-2">
         
-        {/* Navigation / Control Bar */}
-        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-30 pointer-events-none">
-          <div className="flex items-center gap-2 pointer-events-auto">
-            {!isSidebarOpen && (
-              <button 
-                onClick={() => setIsSidebarOpen(true)} 
-                className="p-2 glass bg-white/5 border-white/10 hover:border-aged-cyan text-aged-cyan hover:text-white transition-all rounded-full"
-                title="Open Sidebar"
-              >
-                <SidebarIcon size={18} />
-              </button>
-            )}
+        {/* Modern Navigation Header */}
+        <header className="absolute top-0 left-0 right-0 p-4 md:p-6 flex items-center justify-between z-30 bg-gradient-to-b from-black/80 to-transparent backdrop-blur-md border-b border-white/5">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsSidebarOpen(true)} 
+              className="p-2.5 glass bg-white/5 border-white/10 hover:border-[var(--theme-primary)] text-[var(--theme-primary)] hover:text-white transition-all rounded-2xl group ring-1 ring-white/10"
+              title="Menu"
+            >
+              <SidebarIcon size={20} className="group-hover:scale-110 transition-transform" />
+            </button>
+            
+            <div className="hidden md:flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">System Protocol</span>
+              <span className="text-sm font-bold capitalize text-white flex items-center gap-2">
+                {persona === 'developer' ? <Code size={14} className="text-[var(--theme-primary)]" /> : <GraduationCap size={14} className="text-[var(--theme-primary)]" />}
+                {persona} Mode
+              </span>
+            </div>
           </div>
-          
-          <button 
-            onClick={() => setPersona(null)} 
-            className="pointer-events-auto p-2 glass bg-white/5 border-white/10 hover:border-aged-cyan text-white/50 hover:text-white transition-all rounded-full flex items-center gap-2 group"
+
+          <div className="flex items-center gap-3">
+             <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/5 border border-white/10">
+                <div className="w-2 h-2 rounded-full bg-[var(--theme-primary)] animate-pulse shadow-[0_0_10px_var(--theme-glow)]"></div>
+                <span className="text-[10px] font-bold text-white/60 tracking-widest uppercase">Nodes Online</span>
+             </div>
+             
+             <button 
+            onClick={handleExit} 
+            className="pointer-events-auto p-2.5 glass-premium bg-white/5 hover:border-red-500/50 text-white/50 hover:text-red-400 transition-all rounded-2xl flex items-center gap-3 group px-4"
           >
-            <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" />
-            <span className="text-[10px] font-bold tracking-widest hidden md:inline">EXIT WORKSPACE</span>
+            <RefreshCw size={18} className="group-hover:rotate-180 transition-transform duration-700" />
+            <span className="text-[10px] font-black tracking-widest hidden md:inline uppercase">Reset Core</span>
           </button>
-        </div>
+          </div>
+        </header>
 
         <div className="flex-1 flex flex-col overflow-hidden m-0 md:rounded-tl-2xl relative z-10 transition-all duration-500">
           <div className="flex-1 overflow-y-auto px-4 md:px-0 space-y-10 scroll-smooth custom-scrollbar mt-14 md:mt-20">
@@ -730,10 +770,10 @@ function App() {
 
           <div className="sticky bottom-0 p-4 md:p-10 z-30 transition-all duration-500 mt-auto bg-gradient-to-t from-black via-black/80 to-transparent">
             <div className="max-w-4xl mx-auto w-full relative">
-              <div className="glass bg-white/5 border-white/10 focus-within:border-aged-cyan/40 focus-within:bg-white/10 p-2 md:p-3 flex items-end gap-3 transition-all duration-500 rounded-3xl shadow-2xl relative">
+              <div className="glass-premium bg-white/5 border-white/10 focus-within:border-[var(--theme-primary)]/40 focus-within:bg-white/10 p-2 md:p-3 flex items-end gap-3 transition-all duration-500 rounded-3xl shadow-2xl relative group">
                 <textarea
                   placeholder={persona === 'developer' ? "Paste code or describe the document to generate..." : "Paste code and ask what you want to understand..."}
-                  className="flex-1 bg-transparent border-none text-white text-sm md:text-base resize-none outline-none py-3 px-4 md:px-5 max-h-60 min-h-[56px] font-medium leading-relaxed custom-scrollbar"
+                  className="flex-1 bg-transparent border-none text-white text-sm md:text-base resize-none outline-none py-4 px-4 md:px-6 max-h-60 min-h-[56px] font-medium leading-relaxed custom-scrollbar placeholder:text-white/20"
                   value={inputText}
                   onChange={(e) => {
                     setInputText(e.target.value);
@@ -744,7 +784,7 @@ function App() {
                   rows={1}
                 />
                 <button
-                  className="bg-aged-cyan text-black w-12 md:w-14 h-12 md:h-14 rounded-2xl flex items-center justify-center send-button-glow disabled:opacity-30 disabled:grayscale transition-all shrink-0 mb-1"
+                  className="bg-[var(--theme-primary)] text-black w-12 md:w-14 h-12 md:h-14 rounded-2xl flex items-center justify-center send-button-glow disabled:opacity-30 disabled:grayscale transition-all shrink-0 mb-1 group-hover:scale-105"
                   onClick={() => handleSendMessage()}
                   disabled={isStreaming || isThinking || !inputText.trim()}
                 >
@@ -754,19 +794,19 @@ function App() {
               
               {/* Feedback subtle counters */}
               <div className="mt-5 px-6 flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="flex gap-6 text-[11px] font-bold uppercase tracking-widest text-white/60">
+                <div className="flex gap-6 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
                   <span className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-aged-cyan shadow-[0_0_10px_rgba(0,242,255,0.8)]"></div> 
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--theme-primary)] shadow-[0_0_10px_var(--theme-glow)]"></div> 
                     Words: {wordCount}
                   </span>
                   <span className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-aged-cyan shadow-[0_0_10px_rgba(0,242,255,0.8)]"></div> 
-                    Tokens left: {Math.max(0, 50000 - tokenCount).toLocaleString()} / 50,000
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--theme-primary)] shadow-[0_0_10px_var(--theme-glow)]"></div> 
+                    Tokens: {tokenCount.toLocaleString()}
                   </span>
                 </div>
                 {inputText.length === 0 && messages.length > 0 && (
-                  <p className="text-[10px] text-aged-cyan/50 italic font-medium">
-                    Tip: Paste code for documentation or describe what you want to create.
+                  <p className="text-[10px] text-[var(--theme-primary)]/40 italic font-bold uppercase tracking-widest">
+                    Ready for next command
                   </p>
                 )}
               </div>

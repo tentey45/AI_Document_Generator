@@ -33,21 +33,21 @@ const LandingPage = ({ onSelect }) => {
         <div className="flex flex-col items-center mb-16">
           <div className="w-36 h-36 md:w-72 md:h-72 mb-8 relative z-10 flex items-center justify-center transform transition-all duration-700 hover:scale-105">
             {/* Soft Glow Aura */}
-            <div className="absolute inset-0 bg-aged-cyan/20 blur-[100px] rounded-full animate-pulse"></div>
+            <div className="absolute inset-0 bg-[var(--theme-primary)]/20 blur-[100px] rounded-full animate-pulse"></div>
             <img
               src={agedLogo}
               alt="AGED Logo"
-              className="w-full h-full object-contain mix-blend-screen filter drop-shadow-[0_0_60px_rgba(0,242,255,0.6)] relative z-20"
+              className="w-full h-full object-contain mix-blend-screen filter drop-shadow-[0_0_60px_var(--theme-glow)] relative z-20"
               style={{
                 maskImage: 'radial-gradient(circle at center, black 65%, transparent 95%)',
                 WebkitMaskImage: 'radial-gradient(circle at center, black 65%, transparent 95%)'
               }}
             />
           </div>
-          <p className="text-white text-3xl md:text-5xl font-black tracking-tight mb-4 drop-shadow-[0_0_20px_rgba(0,242,255,0.3)]">
+          <p className="text-white text-3xl md:text-5xl font-black tracking-tight mb-4 drop-shadow-[0_0_20px_var(--theme-glow)]">
             Document Architect & Learning Partner
           </p>
-          <div className="h-1 w-24 bg-aged-cyan rounded-full mb-8"></div>
+          <div className="h-1.5 w-32 bg-aged-cyan rounded-full mb-8 shadow-[0_0_15px_var(--theme-glow)]"></div>
         </div>
 
         <p className="landing-description text-gray-400 mb-16 max-w-xl mx-auto text-sm md:text-base leading-relaxed font-medium">
@@ -79,12 +79,12 @@ const LandingPage = ({ onSelect }) => {
           </div>
 
           <div
-            className="selection-card learner glass p-10 rounded-[2.5rem] cursor-pointer border border-white/5 hover:border-purple-400/50 transition-all duration-500 group relative overflow-hidden bg-white/[0.02] text-left"
+            className="selection-card learner glass-premium p-10 rounded-[2.5rem] cursor-pointer border border-white/5 hover:border-purple-400/50 transition-all duration-500 group relative overflow-hidden bg-white/[0.02] text-left"
             onClick={() => onSelect('learner')}
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-400/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
             <div className="flex items-center gap-4 mb-6">
-              <div className="p-3 rounded-2xl bg-purple-400/10 text-purple-400 group-hover:scale-110 transition-transform">
+              <div className="p-4 rounded-2xl bg-purple-400/10 text-purple-400 group-hover:scale-110 transition-transform">
                 <GraduationCap size={32} />
               </div>
               <h2 className="text-3xl font-black text-white tracking-tight uppercase">Learner</h2>
@@ -93,7 +93,7 @@ const LandingPage = ({ onSelect }) => {
               For learners. Break down complex logic line-by-line, explore architectural
               decisions through analogies, and simplify high-level concepts into actionable knowledge.
             </p>
-            <div className="card-footer flex items-center justify-between text-purple-400 font-black text-[10px] tracking-[0.3em] bg-white/5 p-4 rounded-2xl border border-white/5 group-hover:bg-purple-400 group-hover:text-black transition-all">
+            <div className="card-footer flex items-center justify-between text-purple-400 font-black text-[10px] tracking-[0.3em] bg-white/5 p-5 rounded-2xl border border-white/5 group-hover:bg-purple-500 group-hover:text-black transition-all">
               <span>INITIALIZE LEARNING ENGINE</span>
               <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
             </div>

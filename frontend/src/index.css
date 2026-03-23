@@ -7,6 +7,25 @@
   --color-aged-purple: #9d4edd;
   --color-aged-border: rgba(255, 255, 255, 0.08);
   --shadow-aged-glow: 0 0 30px rgba(0, 242, 255, 0.2);
+  
+  /* Theme Variables */
+  --primary: var(--theme-primary, #00f2ff);
+  --primary-glow: var(--theme-glow, rgba(0, 242, 255, 0.3));
+  --bg-gradient: var(--theme-bg, linear-gradient(to bottom right, #0a0a0f, #121217));
+}
+
+.theme-developer {
+  --theme-primary: #00f2ff;
+  --theme-glow: rgba(0, 242, 255, 0.3);
+  --theme-bg: linear-gradient(to bottom right, #0a192f, #050a0f);
+  --theme-secondary: #001f3f;
+}
+
+.theme-learner {
+  --theme-primary: #9d4edd;
+  --theme-glow: rgba(157, 78, 221, 0.3);
+  --theme-bg: linear-gradient(to bottom right, #1a0a2f, #0d0517);
+  --theme-secondary: #2f0a1a;
 }
 
 @layer base {
@@ -15,12 +34,24 @@
     margin: 0;
     padding: 0;
     min-height: 100vh;
+    background: var(--bg-gradient); /* Updated this line */
   }
 }
 
 @layer components {
   .glass {
-    @apply bg-aged-card backdrop-blur-3xl border border-white/10 rounded-2xl shadow-2xl;
+    @apply backdrop-blur-3xl border border-white/10 rounded-2xl shadow-2xl;
+    background: var(--color-aged-card);
+  }
+
+  .glass-premium {
+    @apply backdrop-blur-2xl border border-white/5 rounded-3xl transition-all duration-500;
+    background: rgba(255, 255, 255, 0.03);
+  }
+  
+  .glass-premium:hover {
+    @apply border-white/20;
+    background: rgba(255, 255, 255, 0.05);
   }
 
   /* Canva-style Document Layout */
@@ -28,13 +59,15 @@
     @apply text-slate-300 leading-relaxed max-w-none;
   }
   .prose-canva h1 {
-    @apply text-white text-4xl font-black mb-8 border-b-4 border-aged-cyan pb-4 inline-block tracking-tight;
+    @apply text-white text-4xl font-black mb-8 pb-4 inline-block tracking-tight;
+    border-bottom: 4px solid var(--theme-primary);
   }
   .prose-canva h2 {
     @apply text-white text-2xl font-bold mt-12 mb-6 border-b border-white/10 pb-2 tracking-tight;
   }
   .prose-canva h3 {
-    @apply text-aged-cyan text-lg font-bold mt-8 mb-4 tracking-wider uppercase;
+    @apply text-lg font-bold mt-8 mb-4 tracking-wider uppercase;
+    color: var(--theme-primary);
   }
   .prose-canva p {
     @apply mb-6 text-[15px] opacity-90;
@@ -47,13 +80,15 @@
   }
   .prose-canva li::before {
     content: "→";
-    @apply text-aged-cyan absolute left-0 font-bold opacity-50;
+    @apply absolute left-0 font-bold opacity-50;
+    color: var(--theme-primary);
   }
   .prose-canva strong {
     @apply text-white font-bold;
   }
   .prose-canva blockquote {
-    @apply border-l-4 border-aged-cyan bg-white/5 p-6 my-8 rounded-r-2xl italic text-slate-400;
+    @apply bg-white/5 p-6 my-8 rounded-r-2xl italic text-slate-400;
+    border-left: 4px solid var(--theme-primary);
   }
 }
 
@@ -78,17 +113,18 @@
 }
 
 .glow-on-hover:hover {
-  box-shadow: 0 0 20px rgba(0, 242, 255, 0.4);
+  box-shadow: 0 0 20px var(--theme-glow);
   transform: translateY(-2px);
 }
 
 .send-button-glow {
-  box-shadow: 0 4px 15px rgba(0, 242, 255, 0.2);
+  box-shadow: 0 4px 15px var(--theme-glow);
   transition: all 0.3s ease;
+  background-color: var(--theme-primary);
 }
 
 .send-button-glow:hover {
-  box-shadow: 0 0 30px rgba(0, 242, 255, 0.5);
+  box-shadow: 0 0 30px var(--theme-glow);
   transform: translateY(-2px) scale(1.05);
 }
 
@@ -108,7 +144,7 @@
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 242, 255, 0.3);
+  background: var(--theme-glow);
 }
 /* Silk Flowing Waves Background */
 .silk-waves {
@@ -164,7 +200,7 @@
   position: absolute;
   width: 150%;
   height: 150%;
-  background: radial-gradient(circle, rgba(0, 242, 255, 0.2) 0%, transparent 70%);
+  background: radial-gradient(circle, var(--theme-glow) 0%, transparent 70%);
   filter: blur(40px);
   animation: glow-pulse 4s ease-in-out infinite;
   z-index: 0;
@@ -200,8 +236,8 @@
 
 .vector-polygon {
   position: absolute;
-  background: linear-gradient(45deg, rgba(0, 242, 255, 0.05), transparent);
-  border: 1px solid rgba(0, 242, 255, 0.1);
+  background: linear-gradient(45deg, var(--theme-glow), transparent);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   pointer-events: none;
   animation: float-around var(--duration) ease-in-out infinite;
 }
@@ -225,8 +261,9 @@
   position: absolute;
   inset: 0;
   background-image: 
-    linear-gradient(to right, rgba(0, 242, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 60px 60px;
   mask-image: radial-gradient(circle at center, black, transparent 80%);
 }
+

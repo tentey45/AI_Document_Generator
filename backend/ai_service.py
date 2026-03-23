@@ -41,7 +41,8 @@ ROUTER_PROMPT = (
     - explanation: For "Explain this", "Help me understand", or beginner questions.
     - document: For explicit generation requests (e.g., "Generate README", "Write documentation", "Create proposal").
 
-    CRITICAL RULE: If the user is just asking a question or greeting you, you MUST choose 'conversation'. ONLY choose 'document' if they are clearly asking to build/create a formal document structure."""
+    CRITICAL RULE: If the user is just asking a question or greeting you, you MUST choose 'conversation'. ONLY choose 'document' if 
+    they are clearly asking to build/create a formal document structure."""
 )
 
 PERSONAS = {
