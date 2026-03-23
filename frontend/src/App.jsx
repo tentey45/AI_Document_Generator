@@ -122,11 +122,11 @@ function App() {
     fetchSessions();
   }, [persona]);
 
-  // Initial load of the active persona on boot
-  useEffect(() => {
-    const activePersona = localStorage.getItem('aged_active_persona');
-    if (activePersona) setPersona(activePersona);
-  }, []);
+  // Initial load of the active persona - DISABLED to always show landing page first
+  // useEffect(() => {
+  //   const activePersona = localStorage.getItem('aged_active_persona');
+  //   if (activePersona) setPersona(activePersona);
+  // }, []);
 
   // Fetch session list
   const fetchSessions = async () => {
